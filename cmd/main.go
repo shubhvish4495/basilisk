@@ -34,7 +34,10 @@ func main() {
 	// logger initializes a new logger instance using slog with a JSON handler
 	// that outputs to the standard output (os.Stdout). The handler options are
 	// set to the default values.
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{}))
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		AddSource: true,
+		Level:     slog.LevelInfo,
+	}))
 	helper.InitLogger(logger)
 
 	// Initialize the configuration
