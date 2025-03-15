@@ -1,5 +1,5 @@
 # PHONY targets (these don't represent files)
-.PHONY: all build run lint clean install-lint
+.PHONY: all build run lint clean install-lint test
 
 # Go parameters
 BINARY_NAME=basilik
@@ -9,7 +9,6 @@ SRC=$(shell find . -type f -name '*.go')
 
 # Check if golangci-lint is installed
 GOLANGCI_LINT=$(shell command -v golangci-lint 2>/dev/null)
-
 
 # Default target
 all: build
@@ -43,10 +42,15 @@ lint: install-lint
 	@golangci-lint run
 	@echo "    ✅ Linter passed"
 
+# Run tests
+test:
+	@echo "+ $@"
+	@echo "    🧪 Running tests..."
+	@go test --race ./...
+	@echo "    ✅ Tests passed"
+
 # Clean build artifacts
 clean:
 	@echo "+ $@"
 	@echo "    🗑️  Cleaning up..."
 	@rm -rf $(BUILD_DIR)
-
-
