@@ -1,0 +1,10 @@
+tlsConf:
+  certFile: "/path/to/cert.pem"
+  keyFile: "/path/to/key.pem"
+database:
+  host: "${DB_HOST}"
+  name: "${DB_NAME}"
+  password: "${DB_PASSWORD}"
+  port: ${DB_PORT}
+  user: "${DB_USER}"
+  sslMode: "disable"

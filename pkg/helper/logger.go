@@ -14,6 +14,9 @@ type Logger interface {
 var l Logger
 
 func GetLogger() Logger {
+	if l == nil {
+		InitLogger(nil)
+	}
 	return l
 }
 
