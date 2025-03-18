@@ -1,9 +1,9 @@
-package rest
+package handlers
 
 import "net/http"
 
 //nolint:errcheck
-func healthCheck(w http.ResponseWriter, r *http.Request) {
+func HealthCheck(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
 }

@@ -10,12 +10,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gorilla/mux"
+	"github.com/rs/cors"
+
 	"github.com/shubhvish4495/basilisk/pkg/config"
-	"github.com/shubhvish4495/basilisk/pkg/db"
 	"github.com/shubhvish4495/basilisk/pkg/helper"
 	"github.com/shubhvish4495/basilisk/pkg/rest"
-
-	"github.com/gorilla/mux"
 )
 
 // main is the entry point of the application. It initializes the logger, configuration,
@@ -47,15 +47,34 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Get the configuration
+	cfg := config.GetConfig()
+
 	// Initialize the database and add the close function
 	// on shutdown by adding it to the shutdown functions
-	_, close := db.GetDb()
-	shutDownFuncs = append(shutDownFuncs, close)
+	// db.SetDB(nil)
+	// _, close := db.GetDb()
+	// shutDownFuncs = append(shutDownFuncs, close)
 
 	r := mux.NewRouter()
+
+	// Adding middleware to the router
+	r.Use(rest.LoggingMiddleware)
+	r.Use(rest.RecoveryMiddleware)
+
+	// Registering routes
+	rest.RegisterRoutes(r)
+
+	corsHandler := cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"},                             // Allow all origins
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE"},  // Allow all methods
+		AllowedHeaders:   []string{"Content-Type", "Authorization"}, // Allow specific headers
+		AllowCredentials: true,
+	}).Handler(r)
+
 	srv := &http.Server{
 		Addr:         ":4444",
-		Handler:      r,
+		Handler:      corsHandler,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
@@ -72,13 +91,6 @@ func main() {
 		logger.Info("Shutting down complete")
 	})
 
-	rest.RegisterRoutes(r)
-
-	// Adding middleware to the router
-	r.Use(rest.LoggingMiddleware)
-	r.Use(rest.RecoveryMiddleware)
-	r.Use(rest.AuthMiddleware)
-
 	// we start the server in a goroutine so that we can listen for
 	// termination signals in the main goroutine. If we have provided
 	// TLS certificate files, we start the server with TLS. We use
@@ -87,9 +99,12 @@ func main() {
 	// We also check if the server fails to start, and if it does, we
 	// log the error and exit the application.
 	go func() {
-		if helper.CheckFileExist("cert.pem") && helper.CheckFileExist("key.pem") {
+		crtFileLoc := cfg.TlsConfig.CertFile
+		keyFileLoc := cfg.TlsConfig.KeyFile
+
+		if helper.CheckFileExist(crtFileLoc) && helper.CheckFileExist(keyFileLoc) {
 			logger.Info("Starting server with TLS on port 4444")
-			if err := srv.ListenAndServeTLS(config.GetConfig().TlsConfig.CertFile, config.GetConfig().TlsConfig.KeyFile); err != nil && err != http.ErrServerClosed {
+			if err := srv.ListenAndServeTLS(crtFileLoc, keyFileLoc); err != nil && err != http.ErrServerClosed {
 				panic(err)
 			}
 		} else {

@@ -5,17 +5,20 @@ import (
 	"fmt"
 	"net/http"
 	"runtime/debug"
+	"strings"
 
 	"github.com/google/uuid"
 
 	"github.com/shubhvish4495/basilisk/pkg/helper"
+	"github.com/shubhvish4495/basilisk/pkg/jwt"
 )
+
+type ctxKey int
 
 const (
-	ctxKeyUUID ctxUUID = "uuid"
+	uuidKey ctxKey = iota
+	userKey
 )
-
-type ctxUUID string
 
 type CustomResponseLogger struct {
 	http.ResponseWriter
@@ -42,7 +45,7 @@ func (c *CustomResponseLogger) WriteHeader(code int) {
 func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		uuid := uuid.New()
-		ctx := context.WithValue(r.Context(), ctxKeyUUID, uuid)
+		ctx := context.WithValue(r.Context(), uuidKey, uuid)
 		wr := &CustomResponseLogger{
 			ResponseWriter: w,
 			StatusCode:     http.StatusOK,
@@ -85,16 +88,43 @@ func RecoveryMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// AuthMiddleware is a middleware function that checks for a valid authentication token
+// in the request header. If the token is valid, it adds the token data to the request
+// context and calls the next handler in the chain. If the token is invalid, it responds
+// with an "Unauthorized" error and a 401 status code.
+//
+// The token is expected to be in the format "Bearer my-secret-token". The token is
+// validated using the jwt.ValidateToken function.
+//
+// Parameters:
+// - next: The next http.Handler to be called if the token is valid.
+//
+// Returns:
+//   - http.Handler: A new http.Handler that wraps the original handler with authentication
+//     token validation.
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Check if the request has a valid authentication token
-		token := r.Header.Get("Authorization")
-		if token != "Bearer my-secret-token" {
+		authHeader := r.Header.Get("Authorization")
+		splittedHeader := strings.Split(authHeader, " ")
+
+		// Check if the token is in the format
+		// "Bearer
+		if len(splittedHeader) != 2 && splittedHeader[0] != "Bearer" {
+			helper.GetLogger().Error("Invalid token format")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
+		data, err := jwt.ValidateToken(splittedHeader[1])
+		if err != nil {
+			helper.GetLogger().Error("Invalid token", "error", err)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), userKey, data)
 		// Call the next handler in the chain
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

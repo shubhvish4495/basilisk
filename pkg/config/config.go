@@ -1,15 +1,23 @@
 package config
 
 import (
+	"encoding/base64"
+	"fmt"
 	"os"
 
 	"github.com/shubhvish4495/basilisk/pkg/helper"
+	"github.com/shubhvish4495/basilisk/pkg/jwt"
 	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
 	TlsConfig TlsConfig `yaml:"tlsConfig"`
 	Database  Database  `yaml:"database"`
+	JWT       JWT       `yaml:"jwt"`
+}
+
+type JWT struct {
+	Secret string `yaml:"secret"`
 }
 
 type TlsConfig struct {
@@ -51,5 +59,13 @@ func Load() error {
 		return err
 	}
 
+	// jwt secret is base64 encoded. We will decode it first and then set it in config
+	decStr, err := base64.StdEncoding.DecodeString(config.JWT.Secret)
+	if err != nil {
+		return fmt.Errorf("error while decoding jwt secret %v", err)
+	}
+
+	// once decoded, then set it into config.JWT.Secret
+	jwt.SetTokenSecret(string(decStr))
 	return nil
 }
