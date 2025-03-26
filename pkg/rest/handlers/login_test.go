@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/shubhvish4495/basilisk/pkg/jwt"
+	"github.com/shubhvish4495/basilisk/pkg/auth"
 	"github.com/shubhvish4495/basilisk/pkg/user"
 	"github.com/stretchr/testify/assert"
 )
@@ -29,7 +29,7 @@ func (m *MockJWT) ValidateToken(token string) (*user.User, error) {
 
 func TestLogin_Success(t *testing.T) {
 	// Mock the JWT generation
-	jwt.Instance = &MockJWT{
+	auth.JWTServiceInstance = &MockJWT{
 		token:    "mock-token",
 		errorVar: nil,
 	}
@@ -48,7 +48,7 @@ func TestLogin_Success(t *testing.T) {
 
 func TestLogin_TokenGenerationError(t *testing.T) {
 	// Mock the JWT generation to return an error
-	jwt.Instance = &MockJWT{
+	auth.JWTServiceInstance = &MockJWT{
 		errorVar: assert.AnError,
 	}
 

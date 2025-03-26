@@ -51,7 +51,7 @@ lint: install-lint
 test:
 	@echo "+ $@"
 	@echo "    🧪 Running tests..."
-	@go test --race ./...
+	@go test -race -cover -coverprofile=coverage.out ./... && go tool cover -html=coverage.out -o coverage.html
 	@echo "    ✅ Tests passed"
 
 # Clean build artifacts

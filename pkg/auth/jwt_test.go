@@ -1,4 +1,4 @@
-package jwt
+package auth
 
 import (
 	"encoding/base64"
@@ -15,7 +15,7 @@ const (
 )
 
 func setupTest(t *testing.T) {
-	err := Init(testSecret)
+	err := LoadJWTService(testSecret)
 	assert.NoError(t, err)
 }
 
@@ -39,12 +39,12 @@ func TestInit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := Init(tt.secret)
+			err := LoadJWTService(tt.secret)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				assert.NotNil(t, Instance)
+				assert.NotNil(t, JWTServiceInstance)
 			}
 		})
 	}
@@ -60,12 +60,12 @@ func TestJWTService_GenerateToken(t *testing.T) {
 	}
 
 	t.Run("Generate valid token", func(t *testing.T) {
-		token, err := Instance.GenerateToken(testUser)
+		token, err := JWTServiceInstance.GenerateToken(testUser)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, token)
 
 		// Validate the generated token
-		parsedUser, err := Instance.ValidateToken(token)
+		parsedUser, err := JWTServiceInstance.ValidateToken(token)
 		assert.NoError(t, err)
 		assert.Equal(t, testUser.ID, parsedUser.ID)
 		assert.Equal(t, testUser.Username, parsedUser.Username)
@@ -90,7 +90,7 @@ func TestJWTService_ValidateToken(t *testing.T) {
 		{
 			name: "Valid token",
 			setupFunc: func() string {
-				token, _ := Instance.GenerateToken(testUser)
+				token, _ := JWTServiceInstance.GenerateToken(testUser)
 				return token
 			},
 			wantErr: false,
@@ -147,7 +147,7 @@ func TestJWTService_ValidateToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			token := tt.setupFunc()
-			user, err := Instance.ValidateToken(token)
+			user, err := JWTServiceInstance.ValidateToken(token)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Nil(t, user)
@@ -207,7 +207,7 @@ func TestJWTService_TokenClaims(t *testing.T) {
 		Roles:    []string{"test-Roles"},
 	}
 
-	token, err := Instance.GenerateToken(testUser)
+	token, err := JWTServiceInstance.GenerateToken(testUser)
 	assert.NoError(t, err)
 
 	// Parse the token without validation to check claims
@@ -238,10 +238,10 @@ func TestJWTService_SecretDecoding(t *testing.T) {
 	originalSecret := "my-secret-key"
 	encodedSecret := base64.StdEncoding.EncodeToString([]byte(originalSecret))
 
-	err := Init(encodedSecret)
+	err := LoadJWTService(encodedSecret)
 	assert.NoError(t, err)
 
-	jwtService, ok := Instance.(*JWTService)
+	jwtService, ok := JWTServiceInstance.(*jwtService)
 	assert.True(t, ok)
 	assert.Equal(t, originalSecret, jwtService.secret)
 }

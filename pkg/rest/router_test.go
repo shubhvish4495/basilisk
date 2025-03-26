@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
-	"github.com/shubhvish4495/basilisk/pkg/jwt"
+	"github.com/shubhvish4495/basilisk/pkg/auth"
 	"github.com/shubhvish4495/basilisk/pkg/rest/handlers"
 	"github.com/stretchr/testify/assert"
 )
@@ -21,7 +21,7 @@ func TestRegisterRoutes(t *testing.T) {
 		path       string
 		handler    http.HandlerFunc
 		middleware bool
-		jwtDetails jwt.JWTInterface
+		jwtDetails auth.JWTInterface
 	}{
 		{
 			name:    "HealthCheck",
@@ -54,7 +54,7 @@ func TestRegisterRoutes(t *testing.T) {
 			assert.NoError(t, err)
 
 			if tt.jwtDetails != nil {
-				jwt.Instance = tt.jwtDetails
+				auth.JWTServiceInstance = tt.jwtDetails
 			}
 
 			rr := httptest.NewRecorder()

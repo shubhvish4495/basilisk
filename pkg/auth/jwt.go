@@ -1,4 +1,4 @@
-package jwt
+package auth
 
 import (
 	"encoding/base64"
@@ -14,7 +14,7 @@ const (
 )
 
 var (
-	Instance JWTInterface
+	JWTServiceInstance JWTInterface
 )
 
 type OwnClaims struct {
@@ -27,11 +27,11 @@ type JWTInterface interface {
 	GenerateToken(user user.User) (string, error)
 }
 
-type JWTService struct {
+type jwtService struct {
 	secret string
 }
 
-// Init initializes the JWT service with the provided secret.
+// LoadJWTService initializes the JWT service with the provided secret.
 // The secret is expected to be a base64 encoded string, which will be decoded
 // and used to configure the JWT service.
 //
@@ -40,13 +40,13 @@ type JWTService struct {
 //
 // Returns:
 //   - error: An error if the secret cannot be decoded, otherwise nil.
-func Init(secret string) error {
+func LoadJWTService(secret string) error {
 	// jwt secret is base64 encoded. We will decode it first and then set it in config
 	decStr, err := base64.StdEncoding.DecodeString(secret)
 	if err != nil {
 		return fmt.Errorf("error while decoding jwt secret %v", err)
 	}
-	Instance = &JWTService{
+	JWTServiceInstance = &jwtService{
 		secret: string(decStr),
 	}
 	return nil
@@ -61,7 +61,7 @@ func Init(secret string) error {
 //
 // Returns:
 //   - error: An error if the token is invalid or if there is an error during parsing.
-func (j *JWTService) ValidateToken(token string) (*user.User, error) {
+func (j *jwtService) ValidateToken(token string) (*user.User, error) {
 	claimsData := OwnClaims{}
 	t, err := jwt.ParseWithClaims(token, &claimsData, func(token *jwt.Token) (interface{}, error) {
 		return []byte(j.secret), nil
@@ -120,7 +120,7 @@ func checkTokenAudience(audience jwt.ClaimStrings) bool {
 // Returns:
 //   - string: The signed JWT token as a string.
 //   - error: An error if the token generation fails.
-func (j *JWTService) GenerateToken(user user.User) (string, error) {
+func (j *jwtService) GenerateToken(user user.User) (string, error) {
 	claims := OwnClaims{
 		UserDetails: user,
 	}

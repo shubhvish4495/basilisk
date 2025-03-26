@@ -13,9 +13,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
 
+	"github.com/shubhvish4495/basilisk/pkg/auth"
 	"github.com/shubhvish4495/basilisk/pkg/config"
 	"github.com/shubhvish4495/basilisk/pkg/helper"
-	"github.com/shubhvish4495/basilisk/pkg/jwt"
 	"github.com/shubhvish4495/basilisk/pkg/rest"
 )
 
@@ -51,7 +51,7 @@ func main() {
 	// Get the configuration
 	cfg := config.GetConfig()
 	// start jwt service here
-	err = jwt.Init(cfg.JWT.Secret)
+	err = auth.LoadJWTService(cfg.JWT.Secret)
 	if err != nil {
 		logger.Error("error while initializing JWT service", "error", err)
 		panic(err)
@@ -73,9 +73,9 @@ func main() {
 	rest.RegisterRoutes(r)
 
 	corsHandler := cors.New(cors.Options{
-		AllowedOrigins:   []string{"*"},                             // Allow all origins
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE"},  // Allow all methods
-		AllowedHeaders:   []string{"Content-Type", "Authorization"}, // Allow specific headers
+		AllowedOrigins:   []string{"*"},                                     // Allow all origins
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "PATCH"}, // Allow all methods
+		AllowedHeaders:   []string{"Content-Type", "Authorization"},         // Allow specific headers
 		AllowCredentials: true,
 	}).Handler(r)
 

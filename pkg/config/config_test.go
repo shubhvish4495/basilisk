@@ -31,18 +31,17 @@ func TestLoad_Success(t *testing.T) {
 	defer os.Unsetenv("TEST_PASSWORD")
 
 	configData := `
-		tlsConfig:
-		certFile: "/path/to/cert.pem"
-		keyFile: "/path/to/key.pem"
-		database:
-		host: "localhost"
-		port: 5432
-		user: "testuser"
-		password: "${TEST_PASSWORD}"
-		name: "testdb"
-		jwt:
-		secret: "test-secret"
-		`
+tlsConfig:
+  certFile: "/path/to/cert.pem"
+  keyFile: "/path/to/key.pem"
+database:
+  host: "localhost"
+  port: 5432
+  user: "testuser"
+  password: "${TEST_PASSWORD}"
+  name: "testdb"
+jwt:
+  secret: "test-secret"`
 	err := os.WriteFile(filepath.Join("config", "config.yml"), []byte(configData), 0644)
 	assert.NoError(t, err)
 
@@ -95,18 +94,17 @@ func TestGetConfig_Success(t *testing.T) {
 	defer cleanup()
 
 	configData := `
-		tlsConfig:
-		certFile: "/path/to/cert.pem"
-		keyFile: "/path/to/key.pem"
-		database:
-		host: "localhost"
-		port: 5432
-		user: "testuser"
-		password: "testpass"
-		name: "testdb"
-		jwt:
-		secret: "test-secret"
-		`
+tlsConfig:
+  certFile: "/path/to/cert.pem"
+  keyFile: "/path/to/key.pem"
+database:
+  host: "localhost"
+  port: 5432
+  user: "testuser"
+  password: "testpass"
+  name: "testdb"
+jwt:
+  secret: "test-secret"`
 	err := os.WriteFile(filepath.Join("config", "config.yml"), []byte(configData), 0644)
 	assert.NoError(t, err)
 
@@ -145,18 +143,18 @@ func TestEnvironmentVariableExpansion(t *testing.T) {
 	}()
 
 	configData := `
-		tlsConfig:
-		certFile: "/path/to/cert.pem"
-		keyFile: "/path/to/key.pem"
-		database:
-		host: "${DB_HOST}"
-		port: 5432
-		user: "testuser"
-		password: "${DB_PASSWORD}"
-		name: "testdb"
-		jwt:
-		secret: "test-secret"
-		`
+tlsConfig:
+  certFile: "/path/to/cert.pem"
+  keyFile: "/path/to/key.pem"
+database:
+  host: "${DB_HOST}"
+  port: 5432
+  user: "testuser"
+  password: "${DB_PASSWORD}"
+  name: "testdb"
+jwt:
+  secret: "test-secret"`
+
 	err := os.WriteFile(filepath.Join("config", "config.yml"), []byte(configData), 0644)
 	assert.NoError(t, err)
 

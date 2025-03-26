@@ -3,8 +3,8 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/shubhvish4495/basilisk/pkg/auth"
 	"github.com/shubhvish4495/basilisk/pkg/helper"
-	"github.com/shubhvish4495/basilisk/pkg/jwt"
 	"github.com/shubhvish4495/basilisk/pkg/user"
 )
 
@@ -26,7 +26,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		Username: "test-user",
 		Roles:    []string{"user:self:get"},
 	}
-	t, err := jwt.Instance.GenerateToken(user)
+	t, err := auth.JWTServiceInstance.GenerateToken(user)
 	if err != nil {
 		helper.GetLogger().Error("Error generating token", "error", err)
 		w.WriteHeader(http.StatusInternalServerError)

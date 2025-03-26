@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/shubhvish4495/basilisk/pkg/jwt"
+	"github.com/shubhvish4495/basilisk/pkg/auth"
 	"github.com/shubhvish4495/basilisk/pkg/user"
 	"github.com/stretchr/testify/assert"
 )
@@ -66,7 +66,7 @@ func TestAuthMiddleware_ValidToken(t *testing.T) {
 	middleware := AuthMiddleware(handler)
 
 	validToken := "valid-token"
-	jwt.Instance = &MockJWT{token: validToken}
+	auth.JWTServiceInstance = &MockJWT{token: validToken}
 
 	req := httptest.NewRequest("GET", "http://example.com/foo", nil)
 	req.Header.Set("Authorization", "Bearer "+validToken)
@@ -85,7 +85,7 @@ func TestAuthMiddleware_InvalidToken(t *testing.T) {
 	middleware := AuthMiddleware(handler)
 
 	invalidToken := "invalid-token"
-	jwt.Instance = &MockJWT{token: "valid-token", errorVar: assert.AnError}
+	auth.JWTServiceInstance = &MockJWT{token: "valid-token", errorVar: assert.AnError}
 
 	req := httptest.NewRequest("GET", "http://example.com/foo", nil)
 	req.Header.Set("Authorization", "Bearer "+invalidToken)

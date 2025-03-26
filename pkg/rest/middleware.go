@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/shubhvish4495/basilisk/pkg/auth"
 	"github.com/shubhvish4495/basilisk/pkg/helper"
-	"github.com/shubhvish4495/basilisk/pkg/jwt"
 )
 
 type ctxKey int
@@ -116,7 +116,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		data, err := jwt.Instance.ValidateToken(splittedHeader[1])
+		data, err := auth.JWTServiceInstance.ValidateToken(splittedHeader[1])
 		if err != nil {
 			helper.GetLogger().Error("Invalid token", "error", err)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
