@@ -1,11 +1,11 @@
 package jwt
 
 import (
+	"encoding/base64"
 	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-
 	"github.com/shubhvish4495/basilisk/pkg/user"
 )
 
@@ -14,7 +14,7 @@ const (
 )
 
 var (
-	tokenSecret string
+	Instance JWTInterface
 )
 
 type OwnClaims struct {
@@ -22,9 +22,34 @@ type OwnClaims struct {
 	UserDetails user.User `json:"user"`
 }
 
-// SetTokenSecret will set secret for JWT token generation
-func SetTokenSecret(secret string) {
-	tokenSecret = secret
+type JWTInterface interface {
+	ValidateToken(token string) (*user.User, error)
+	GenerateToken(user user.User) (string, error)
+}
+
+type JWTService struct {
+	secret string
+}
+
+// Init initializes the JWT service with the provided secret.
+// The secret is expected to be a base64 encoded string, which will be decoded
+// and used to configure the JWT service.
+//
+// Parameters:
+//   - secret: A base64 encoded string representing the JWT secret.
+//
+// Returns:
+//   - error: An error if the secret cannot be decoded, otherwise nil.
+func Init(secret string) error {
+	// jwt secret is base64 encoded. We will decode it first and then set it in config
+	decStr, err := base64.StdEncoding.DecodeString(secret)
+	if err != nil {
+		return fmt.Errorf("error while decoding jwt secret %v", err)
+	}
+	Instance = &JWTService{
+		secret: string(decStr),
+	}
+	return nil
 }
 
 // ValidateToken validates a JWT token string.
@@ -36,10 +61,10 @@ func SetTokenSecret(secret string) {
 //
 // Returns:
 //   - error: An error if the token is invalid or if there is an error during parsing.
-func ValidateToken(token string) (*user.User, error) {
+func (j *JWTService) ValidateToken(token string) (*user.User, error) {
 	claimsData := OwnClaims{}
 	t, err := jwt.ParseWithClaims(token, &claimsData, func(token *jwt.Token) (interface{}, error) {
-		return []byte(tokenSecret), nil
+		return []byte(j.secret), nil
 	})
 	if err != nil {
 		return nil, err
@@ -95,7 +120,7 @@ func checkTokenAudience(audience jwt.ClaimStrings) bool {
 // Returns:
 //   - string: The signed JWT token as a string.
 //   - error: An error if the token generation fails.
-func GenerateToken(user user.User) (string, error) {
+func (j *JWTService) GenerateToken(user user.User) (string, error) {
 	claims := OwnClaims{
 		UserDetails: user,
 	}
@@ -109,5 +134,5 @@ func GenerateToken(user user.User) (string, error) {
 	claims.NotBefore = &jwt.NumericDate{Time: time.Now()}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(tokenSecret))
+	return token.SignedString([]byte(j.secret))
 }

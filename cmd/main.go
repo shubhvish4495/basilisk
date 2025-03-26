@@ -15,6 +15,7 @@ import (
 
 	"github.com/shubhvish4495/basilisk/pkg/config"
 	"github.com/shubhvish4495/basilisk/pkg/helper"
+	"github.com/shubhvish4495/basilisk/pkg/jwt"
 	"github.com/shubhvish4495/basilisk/pkg/rest"
 )
 
@@ -49,6 +50,12 @@ func main() {
 
 	// Get the configuration
 	cfg := config.GetConfig()
+	// start jwt service here
+	err = jwt.Init(cfg.JWT.Secret)
+	if err != nil {
+		logger.Error("error while initializing JWT service", "error", err)
+		panic(err)
+	}
 
 	// Initialize the database and add the close function
 	// on shutdown by adding it to the shutdown functions

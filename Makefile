@@ -1,11 +1,16 @@
 # PHONY targets (these don't represent files)
-.PHONY: all build run lint clean install-lint test
+.PHONY: all build run lint clean install-lint test docker-build docker-run
 
 # Go parameters
 BINARY_NAME=basilik
 BUILD_DIR=bin
 GOLANGCI_LINT_URL=github.com/golangci/golangci-lint/cmd/golangci-lint@v1.63.4
 SRC=$(shell find . -type f -name '*.go')
+# Build Docker/Podman image
+CONTAINER_ENGINE := $(shell command -v docker 2>/dev/null || command -v podman 2>/dev/null)
+ifeq (,$(CONTAINER_ENGINE))
+    $(error "Neither Docker nor Podman is installed")
+endif
 
 # Check if golangci-lint is installed
 GOLANGCI_LINT=$(shell command -v golangci-lint 2>/dev/null)
@@ -54,3 +59,14 @@ clean:
 	@echo "+ $@"
 	@echo "    🗑️  Cleaning up..."
 	@rm -rf $(BUILD_DIR)
+
+docker-build:
+	@echo "+ $@"
+	@echo "    🐳 Building Docker image..."
+	$(CONTAINER_ENGINE) build -t $(BINARY_NAME) .
+
+# Run Docker container
+docker-run: docker-build
+	@echo "+ $@"
+	@echo "    🐳 Running Docker container..."
+	$(CONTAINER_ENGINE) run -it $(BINARY_NAME)

@@ -26,7 +26,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		Username: "test-user",
 		Roles:    []string{"user:self:get"},
 	}
-	t, err := jwt.GenerateToken(user)
+	t, err := jwt.Instance.GenerateToken(user)
 	if err != nil {
 		helper.GetLogger().Error("Error generating token", "error", err)
 		w.WriteHeader(http.StatusInternalServerError)

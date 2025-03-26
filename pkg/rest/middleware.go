@@ -116,7 +116,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		data, err := jwt.ValidateToken(splittedHeader[1])
+		data, err := jwt.Instance.ValidateToken(splittedHeader[1])
 		if err != nil {
 			helper.GetLogger().Error("Invalid token", "error", err)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
