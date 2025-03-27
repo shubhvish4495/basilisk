@@ -75,8 +75,7 @@ func TestJWTService_GenerateToken(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, testUser.ID, parsedUser.ID)
 		assert.Equal(t, testUser.Username, parsedUser.Username)
-		eRoles, _ := ExtractRoles(parsedUser.Roles)
-		assert.Equal(t, testUser.Roles, eRoles)
+		assert.Equal(t, testUser.Roles, parsedUser.Roles)
 	})
 }
 
@@ -95,7 +94,7 @@ func TestJWTService_ValidateToken(t *testing.T) {
 		},
 	}
 
-	testUserDetails := UserDetails{
+	testUserDetails := userDetails{
 		ID:       testUser.ID,
 		Username: testUser.Username,
 		Roles:    GetRoleString(testUser.Roles),
@@ -118,7 +117,7 @@ func TestJWTService_ValidateToken(t *testing.T) {
 			name: "Expired token",
 			setupFunc: func() string {
 				claims := OwnClaims{
-					UserDetails: testUserDetails,
+					userDetails: testUserDetails,
 					RegisteredClaims: jwt.RegisteredClaims{
 						ExpiresAt: &jwt.NumericDate{Time: time.Now().Add(-time.Hour)},
 						IssuedAt:  &jwt.NumericDate{Time: time.Now().Add(-time.Hour * 2)},
@@ -138,7 +137,7 @@ func TestJWTService_ValidateToken(t *testing.T) {
 			name: "Invalid audience",
 			setupFunc: func() string {
 				claims := OwnClaims{
-					UserDetails: testUserDetails,
+					userDetails: testUserDetails,
 					RegisteredClaims: jwt.RegisteredClaims{
 						ExpiresAt: &jwt.NumericDate{Time: time.Now().Add(time.Hour)},
 						IssuedAt:  &jwt.NumericDate{Time: time.Now()},
@@ -175,7 +174,7 @@ func TestJWTService_ValidateToken(t *testing.T) {
 				assert.NotNil(t, user)
 				assert.Equal(t, testUser.ID, user.ID)
 				assert.Equal(t, testUser.Username, user.Username)
-				assert.Equal(t, GetRoleString(testUser.Roles), user.Roles)
+				assert.Equal(t, testUser.Roles, user.Roles)
 			}
 		})
 	}
@@ -253,9 +252,9 @@ func TestJWTService_TokenClaims(t *testing.T) {
 	assert.NotNil(t, claims.NotBefore)
 
 	// Verify user details in claims
-	assert.Equal(t, testUser.ID, claims.UserDetails.ID)
-	assert.Equal(t, testUser.Username, claims.UserDetails.Username)
-	assert.Equal(t, GetRoleString(testUser.Roles), claims.UserDetails.Roles)
+	assert.Equal(t, testUser.ID, claims.userDetails.ID)
+	assert.Equal(t, testUser.Username, claims.userDetails.Username)
+	assert.Equal(t, GetRoleString(testUser.Roles), claims.userDetails.Roles)
 }
 
 func TestJWTService_SecretDecoding(t *testing.T) {

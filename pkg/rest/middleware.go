@@ -2,7 +2,6 @@ package rest
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"runtime/debug"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/shubhvish4495/basilisk/pkg/auth"
 	"github.com/shubhvish4495/basilisk/pkg/helper"
-	"github.com/shubhvish4495/basilisk/pkg/user"
 )
 
 type ctxKey int
@@ -126,18 +124,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		roles, err := auth.ExtractRoles(data.Roles)
-		if err != nil {
-			helper.GetLogger().Error("error while extracting role", "error", err)
-			helper.SendError(w, http.StatusUnauthorized, errors.New("user does not have proper/required roles to access"))
-			return
-		}
-
-		ctx := context.WithValue(r.Context(), userKey, user.User{
-			ID:       data.ID,
-			Username: data.Username,
-			Roles:    roles,
-		})
+		ctx := context.WithValue(r.Context(), userKey, data)
 		// Call the next handler in the chain
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

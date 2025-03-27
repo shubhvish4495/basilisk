@@ -14,7 +14,7 @@ import (
 type MockJWT struct {
 	token    string
 	errorVar error
-	user     *auth.UserDetails
+	user     *user.User
 }
 
 // GenerateToken will generate mock token as set in MockJWT struct
@@ -23,7 +23,7 @@ func (m *MockJWT) GenerateToken(u user.User) (string, error) {
 }
 
 // ValidateToken will generate mock token as set in MockJWT struct
-func (m *MockJWT) ValidateToken(token string) (*auth.UserDetails, error) {
+func (m *MockJWT) ValidateToken(token string) (*user.User, error) {
 	return m.user, m.errorVar
 }
 
@@ -68,10 +68,16 @@ func TestAuthMiddleware_ValidToken(t *testing.T) {
 	validToken := "valid-token"
 	auth.JWTServiceInstance = &MockJWT{
 		token: validToken,
-		user: &auth.UserDetails{
+		user: &user.User{
 			ID:       123,
 			Username: "test-user",
-			Roles:    []string{"test-service:test-resource:read"},
+			Roles: []user.Role{
+				{
+					Service:   "test-service",
+					Resource:  "test-resource",
+					Operation: user.Admin,
+				},
+			},
 		},
 	}
 

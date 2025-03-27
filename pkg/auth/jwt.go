@@ -17,7 +17,7 @@ var (
 	JWTServiceInstance JWTInterface
 )
 
-type UserDetails struct {
+type userDetails struct {
 	ID       int      `json:"id"`
 	Username string   `json:"username"`
 	Roles    []string `json:"roles"`
@@ -25,11 +25,11 @@ type UserDetails struct {
 
 type OwnClaims struct {
 	jwt.RegisteredClaims
-	UserDetails `json:"user"`
+	userDetails `json:"user"`
 }
 
 type JWTInterface interface {
-	ValidateToken(token string) (*UserDetails, error)
+	ValidateToken(token string) (*user.User, error)
 	GenerateToken(user user.User) (string, error)
 }
 
@@ -67,7 +67,7 @@ func LoadJWTService(secret string) error {
 //
 // Returns:
 //   - error: An error if the token is invalid or if there is an error during parsing.
-func (j *jwtService) ValidateToken(token string) (*UserDetails, error) {
+func (j *jwtService) ValidateToken(token string) (*user.User, error) {
 	claimsData := OwnClaims{}
 	t, err := jwt.ParseWithClaims(token, &claimsData, func(token *jwt.Token) (interface{}, error) {
 		return []byte(j.secret), nil
@@ -92,7 +92,19 @@ func (j *jwtService) ValidateToken(token string) (*UserDetails, error) {
 		return nil, fmt.Errorf("invalid audience")
 	}
 
-	return &claimsData.UserDetails, nil
+	//convert userDetails to user.User
+	ud := claimsData.userDetails
+	eRoles, err := ExtractRoles(ud.Roles)
+	if err != nil {
+		return nil, err
+	}
+	userData := user.User{
+		ID:       ud.ID,
+		Username: ud.Username,
+		Roles:    eRoles,
+	}
+
+	return &userData, nil
 }
 
 // checkTokenAudience checks if the provided audience contains the service's own name.
@@ -128,7 +140,7 @@ func checkTokenAudience(audience jwt.ClaimStrings) bool {
 //   - error: An error if the token generation fails.
 func (j *jwtService) GenerateToken(user user.User) (string, error) {
 	claims := OwnClaims{
-		UserDetails: UserDetails{
+		userDetails: userDetails{
 			ID:       user.ID,
 			Username: user.Username,
 			Roles:    GetRoleString(user.Roles),
