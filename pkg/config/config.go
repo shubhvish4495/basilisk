@@ -10,6 +10,11 @@ import (
 type Config struct {
 	TlsConfig TlsConfig `yaml:"tlsConfig"`
 	Database  Database  `yaml:"database"`
+	JWT       JWT       `yaml:"jwt"`
+}
+
+type JWT struct {
+	Secret string `yaml:"secret"`
 }
 
 type TlsConfig struct {

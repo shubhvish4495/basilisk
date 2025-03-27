@@ -26,3 +26,10 @@ go.work.sum
 
 .vscode
 bin/
+
+*.crt
+*.key
+*.pem
+*.csr
+
+coverage*

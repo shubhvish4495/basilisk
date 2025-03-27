@@ -13,6 +13,8 @@ type Logger interface {
 
 var l Logger
 
+// GetLogger returns the singleton instance of Logger. If the logger has not been
+// initialized yet, it initializes the logger by calling InitLogger with a nil argument.
 func GetLogger() Logger {
 	if l == nil {
 		InitLogger(nil)
@@ -20,6 +22,13 @@ func GetLogger() Logger {
 	return l
 }
 
+// InitLogger initializes the logger with the provided Logger instance.
+// If the provided Logger instance is nil, it creates a new JSON logger
+// with default settings and assigns it to the global logger variable.
+//
+// Parameters:
+//
+//	lVar - Logger instance to initialize. If nil, a default JSON logger is created.
 func InitLogger(lVar Logger) {
 	// init logger
 	if lVar == nil {

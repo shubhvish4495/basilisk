@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/shubhvish4495/basilisk/pkg/rest/handlers"
 )
 
 func RegisterRoutes(r *mux.Router) {
@@ -14,6 +15,20 @@ func RegisterRoutes(r *mux.Router) {
 	// Register routes here
 	s.Path("/health").
 		Methods(http.MethodGet).
-		HandlerFunc(healthCheck).
+		HandlerFunc(handlers.HealthCheck).
 		Name("healthCheck")
+
+	s.Path("/login").
+		Methods(http.MethodGet).
+		HandlerFunc(handlers.Login).
+		Name("login")
+
+	// protected routes
+	p := s.PathPrefix("").Subrouter()
+	p.Use(AuthMiddleware)
+
+	p.Path("/users").
+		Methods(http.MethodGet).
+		HandlerFunc(handlers.GetUsers).
+		Name("getUsers")
 }

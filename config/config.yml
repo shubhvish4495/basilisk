@@ -1,6 +1,6 @@
-tlsConf:
-  certFile: "/path/to/cert.pem"
-  keyFile: "/path/to/key.pem"
+tlsConfig:
+  certFile: "${TLS_CERT_FILE}"
+  keyFile: "${TLS_KEY_FILE}"
 database:
   host: "${DB_HOST}"
   name: "${DB_NAME}"
@@ -8,3 +8,5 @@ database:
   port: ${DB_PORT}
   user: "${DB_USER}"
   sslMode: "disable"
+jwt:
+  secret: "${JWT_SECRET}"

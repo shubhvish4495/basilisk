@@ -17,3 +17,7 @@ func GetDb() (DB, func() error) {
 	}
 	return instance, instance.Close
 }
+
+func SetDB(db DB) {
+	instance = db
+}
