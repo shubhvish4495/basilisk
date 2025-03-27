@@ -56,7 +56,13 @@ func TestJWTService_GenerateToken(t *testing.T) {
 	testUser := user.User{
 		ID:       123,
 		Username: "testuser",
-		Roles:    []string{"test-Roles"},
+		Roles: []user.Role{
+			{
+				Service:   "test-service",
+				Resource:  "test-resource",
+				Operation: user.Read,
+			},
+		},
 	}
 
 	t.Run("Generate valid token", func(t *testing.T) {
@@ -69,7 +75,8 @@ func TestJWTService_GenerateToken(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, testUser.ID, parsedUser.ID)
 		assert.Equal(t, testUser.Username, parsedUser.Username)
-		assert.Equal(t, testUser.Roles, parsedUser.Roles)
+		eRoles, _ := ExtractRoles(parsedUser.Roles)
+		assert.Equal(t, testUser.Roles, eRoles)
 	})
 }
 
@@ -79,7 +86,19 @@ func TestJWTService_ValidateToken(t *testing.T) {
 	testUser := user.User{
 		ID:       123,
 		Username: "testuser",
-		Roles:    []string{"test-Roles"},
+		Roles: []user.Role{
+			{
+				Service:   "test-service",
+				Resource:  "test-resource",
+				Operation: user.Read,
+			},
+		},
+	}
+
+	testUserDetails := UserDetails{
+		ID:       testUser.ID,
+		Username: testUser.Username,
+		Roles:    GetRoleString(testUser.Roles),
 	}
 
 	tests := []struct {
@@ -99,7 +118,7 @@ func TestJWTService_ValidateToken(t *testing.T) {
 			name: "Expired token",
 			setupFunc: func() string {
 				claims := OwnClaims{
-					UserDetails: testUser,
+					UserDetails: testUserDetails,
 					RegisteredClaims: jwt.RegisteredClaims{
 						ExpiresAt: &jwt.NumericDate{Time: time.Now().Add(-time.Hour)},
 						IssuedAt:  &jwt.NumericDate{Time: time.Now().Add(-time.Hour * 2)},
@@ -119,7 +138,7 @@ func TestJWTService_ValidateToken(t *testing.T) {
 			name: "Invalid audience",
 			setupFunc: func() string {
 				claims := OwnClaims{
-					UserDetails: testUser,
+					UserDetails: testUserDetails,
 					RegisteredClaims: jwt.RegisteredClaims{
 						ExpiresAt: &jwt.NumericDate{Time: time.Now().Add(time.Hour)},
 						IssuedAt:  &jwt.NumericDate{Time: time.Now()},
@@ -156,7 +175,7 @@ func TestJWTService_ValidateToken(t *testing.T) {
 				assert.NotNil(t, user)
 				assert.Equal(t, testUser.ID, user.ID)
 				assert.Equal(t, testUser.Username, user.Username)
-				assert.Equal(t, testUser.Roles, user.Roles)
+				assert.Equal(t, GetRoleString(testUser.Roles), user.Roles)
 			}
 		})
 	}
@@ -204,7 +223,13 @@ func TestJWTService_TokenClaims(t *testing.T) {
 	testUser := user.User{
 		ID:       123,
 		Username: "testuser",
-		Roles:    []string{"test-Roles"},
+		Roles: []user.Role{
+			{
+				Service:   "test-service",
+				Resource:  "test-resource",
+				Operation: user.Read,
+			},
+		},
 	}
 
 	token, err := JWTServiceInstance.GenerateToken(testUser)
@@ -230,7 +255,7 @@ func TestJWTService_TokenClaims(t *testing.T) {
 	// Verify user details in claims
 	assert.Equal(t, testUser.ID, claims.UserDetails.ID)
 	assert.Equal(t, testUser.Username, claims.UserDetails.Username)
-	assert.Equal(t, testUser.Roles, claims.UserDetails.Roles)
+	assert.Equal(t, GetRoleString(testUser.Roles), claims.UserDetails.Roles)
 }
 
 func TestJWTService_SecretDecoding(t *testing.T) {

@@ -24,7 +24,13 @@ import (
 func Login(w http.ResponseWriter, r *http.Request) {
 	user := user.User{
 		Username: "test-user",
-		Roles:    []string{"user:self:get"},
+		Roles: []user.Role{
+			{
+				Service:   "service-name",
+				Resource:  "resource-name",
+				Operation: user.Admin,
+			},
+		},
 	}
 	t, err := auth.JWTServiceInstance.GenerateToken(user)
 	if err != nil {

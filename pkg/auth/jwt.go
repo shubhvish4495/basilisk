@@ -17,13 +17,19 @@ var (
 	JWTServiceInstance JWTInterface
 )
 
+type UserDetails struct {
+	ID       int      `json:"id"`
+	Username string   `json:"username"`
+	Roles    []string `json:"roles"`
+}
+
 type OwnClaims struct {
 	jwt.RegisteredClaims
-	UserDetails user.User `json:"user"`
+	UserDetails `json:"user"`
 }
 
 type JWTInterface interface {
-	ValidateToken(token string) (*user.User, error)
+	ValidateToken(token string) (*UserDetails, error)
 	GenerateToken(user user.User) (string, error)
 }
 
@@ -61,7 +67,7 @@ func LoadJWTService(secret string) error {
 //
 // Returns:
 //   - error: An error if the token is invalid or if there is an error during parsing.
-func (j *jwtService) ValidateToken(token string) (*user.User, error) {
+func (j *jwtService) ValidateToken(token string) (*UserDetails, error) {
 	claimsData := OwnClaims{}
 	t, err := jwt.ParseWithClaims(token, &claimsData, func(token *jwt.Token) (interface{}, error) {
 		return []byte(j.secret), nil
@@ -122,7 +128,11 @@ func checkTokenAudience(audience jwt.ClaimStrings) bool {
 //   - error: An error if the token generation fails.
 func (j *jwtService) GenerateToken(user user.User) (string, error) {
 	claims := OwnClaims{
-		UserDetails: user,
+		UserDetails: UserDetails{
+			ID:       user.ID,
+			Username: user.Username,
+			Roles:    GetRoleString(user.Roles),
+		},
 	}
 
 	// populate claims field
