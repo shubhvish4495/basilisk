@@ -5,8 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/shubhvish4495/basilisk/pkg/auth"
-	"github.com/shubhvish4495/basilisk/pkg/user"
+	"basilisk/pkg/auth"
+	"basilisk/pkg/db"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,17 +15,17 @@ import (
 type MockJWT struct {
 	token    string
 	errorVar error
-	user     *user.User
+	user     *db.User
 }
 
 // GenerateToken will generate mock token as set in MockJWT struct
-func (m *MockJWT) GenerateToken(u user.User) (string, error) {
+func (m *MockJWT) GenerateToken(u db.User) (string, error) {
 	return m.token, m.errorVar
 }
 
 // ValidateToken will generate mock token as set in MockJWT struct
-func (m *MockJWT) ValidateToken(token string) (*user.User, error) {
-	return m.user, m.errorVar
+func (m *MockJWT) ValidateToken(token string) (string, error) {
+	return m.user.ID, m.errorVar
 }
 
 func TestLoggingMiddleware(t *testing.T) {
@@ -68,16 +69,9 @@ func TestAuthMiddleware_ValidToken(t *testing.T) {
 	validToken := "valid-token"
 	auth.JWTServiceInstance = &MockJWT{
 		token: validToken,
-		user: &user.User{
-			ID:       123,
-			Username: "test-user",
-			Roles: []user.Role{
-				{
-					Service:   "test-service",
-					Resource:  "test-resource",
-					Operation: user.Admin,
-				},
-			},
+		user: &db.User{
+			ID:   "mock-id",
+			Name: "test-user",
 		},
 	}
 
@@ -98,7 +92,7 @@ func TestAuthMiddleware_InvalidToken(t *testing.T) {
 	middleware := AuthMiddleware(handler)
 
 	invalidToken := "invalid-token"
-	auth.JWTServiceInstance = &MockJWT{token: "valid-token", errorVar: assert.AnError}
+	auth.JWTServiceInstance = &MockJWT{token: "valid-token", errorVar: assert.AnError, user: &db.User{ID: "mock-id"}}
 
 	req := httptest.NewRequest("GET", "http://example.com/foo", nil)
 	req.Header.Set("Authorization", "Bearer "+invalidToken)

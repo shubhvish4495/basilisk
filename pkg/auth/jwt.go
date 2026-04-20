@@ -1,12 +1,15 @@
 package auth
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/shubhvish4495/basilisk/pkg/user"
+
+	"basilisk/pkg/db"
 )
 
 const (
@@ -17,20 +20,14 @@ var (
 	JWTServiceInstance JWTInterface
 )
 
-type userDetails struct {
-	ID       int      `json:"id"`
-	Username string   `json:"username"`
-	Roles    []string `json:"roles"`
-}
-
 type OwnClaims struct {
 	jwt.RegisteredClaims
-	userDetails `json:"user"`
+	db.User `json:"user"`
 }
 
 type JWTInterface interface {
-	ValidateToken(token string) (*user.User, error)
-	GenerateToken(user user.User) (string, error)
+	ValidateToken(token string) (string, error)
+	GenerateToken(user db.User) (string, error)
 }
 
 type jwtService struct {
@@ -42,11 +39,12 @@ type jwtService struct {
 // and used to configure the JWT service.
 //
 // Parameters:
+//   - context: context
 //   - secret: A base64 encoded string representing the JWT secret.
 //
 // Returns:
 //   - error: An error if the secret cannot be decoded, otherwise nil.
-func LoadJWTService(secret string) error {
+func LoadJWTService(ctx context.Context, secret string) error {
 	// jwt secret is base64 encoded. We will decode it first and then set it in config
 	decStr, err := base64.StdEncoding.DecodeString(secret)
 	if err != nil {
@@ -67,44 +65,32 @@ func LoadJWTService(secret string) error {
 //
 // Returns:
 //   - error: An error if the token is invalid or if there is an error during parsing.
-func (j *jwtService) ValidateToken(token string) (*user.User, error) {
+func (j *jwtService) ValidateToken(token string) (string, error) {
 	claimsData := OwnClaims{}
 	t, err := jwt.ParseWithClaims(token, &claimsData, func(token *jwt.Token) (interface{}, error) {
 		return []byte(j.secret), nil
 	})
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	// if token is not valid return invalid token error
 	if !t.Valid {
-		return nil, fmt.Errorf("invalid token")
+		return "", fmt.Errorf("invalid token")
 	}
 
 	// get audience from claims
 	aud, err := t.Claims.GetAudience()
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	// check audience for token
 	if !checkTokenAudience(aud) {
-		return nil, fmt.Errorf("invalid audience")
+		return "", fmt.Errorf("invalid audience")
 	}
 
-	//convert userDetails to user.User
-	ud := claimsData.userDetails
-	eRoles, err := ExtractRoles(ud.Roles)
-	if err != nil {
-		return nil, err
-	}
-	userData := user.User{
-		ID:       ud.ID,
-		Username: ud.Username,
-		Roles:    eRoles,
-	}
-
-	return &userData, nil
+	return claimsData.User.ID, nil
 }
 
 // checkTokenAudience checks if the provided audience contains the service's own name.
@@ -119,12 +105,7 @@ func (j *jwtService) ValidateToken(token string) (*user.User, error) {
 //
 //	bool: True if the audience contains the service's own name, false otherwise.
 func checkTokenAudience(audience jwt.ClaimStrings) bool {
-	for _, a := range audience {
-		if a == ownServiceName {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(audience, ownServiceName)
 }
 
 // GenerateToken generates a JWT token for the given user.
@@ -138,12 +119,10 @@ func checkTokenAudience(audience jwt.ClaimStrings) bool {
 // Returns:
 //   - string: The signed JWT token as a string.
 //   - error: An error if the token generation fails.
-func (j *jwtService) GenerateToken(user user.User) (string, error) {
+func (j *jwtService) GenerateToken(user db.User) (string, error) {
 	claims := OwnClaims{
-		userDetails: userDetails{
-			ID:       user.ID,
-			Username: user.Username,
-			Roles:    GetRoleString(user.Roles),
+		User: db.User{
+			ID: user.ID,
 		},
 	}
 

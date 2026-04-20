@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
-	"github.com/shubhvish4495/basilisk/pkg/auth"
-	"github.com/shubhvish4495/basilisk/pkg/rest/handlers"
+	"basilisk/pkg/auth"
+	"basilisk/pkg/rest/handlers"
 	"github.com/stretchr/testify/assert"
 )
 

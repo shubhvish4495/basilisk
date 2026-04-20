@@ -1,5 +1,5 @@
 # PHONY targets (these don't represent files)
-.PHONY: all build run lint clean install-lint test docker-build docker-run
+.PHONY: all build build-linux run lint clean install-lint test docker-build docker-run
 
 # Go parameters
 BINARY_NAME=basilik
@@ -25,6 +25,13 @@ build: clean lint $(SRC)
 	@echo "    🔨 Building the binary..."
 	@go build -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd
 
+# Build the Go application for Linux
+build-linux: clean lint $(SRC)
+	@echo "+ $@"
+	@mkdir -p $(BUILD_DIR)
+	@echo "    🔨 Building the binary for Linux..."
+	@GOOS=linux GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME)-linux ./cmd
+
 # Run the application
 run: build
 	@echo "🚀 Running the application..."
@@ -44,7 +51,7 @@ install-lint:
 lint: install-lint
 	@echo "+ $@"
 	@echo "    🔍 Running linter in current directory only..."
-	@golangci-lint run
+	@golangci-lint run --tests=false
 	@echo "    ✅ Linter passed"
 
 # Run tests

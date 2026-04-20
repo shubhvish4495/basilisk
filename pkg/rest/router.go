@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
-	"github.com/shubhvish4495/basilisk/pkg/rest/handlers"
+	"basilisk/pkg/rest/handlers"
 )
 
 func RegisterRoutes(r *mux.Router) {

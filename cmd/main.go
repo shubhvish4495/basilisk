@@ -13,10 +13,11 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
 
-	"github.com/shubhvish4495/basilisk/pkg/auth"
-	"github.com/shubhvish4495/basilisk/pkg/config"
-	"github.com/shubhvish4495/basilisk/pkg/helper"
-	"github.com/shubhvish4495/basilisk/pkg/rest"
+	"basilisk/pkg/auth"
+	"basilisk/pkg/config"
+	"basilisk/pkg/db"
+	"basilisk/pkg/helper"
+	"basilisk/pkg/rest"
 )
 
 // main is the entry point of the application. It initializes the logger, configuration,
@@ -32,26 +33,29 @@ func main() {
 	shutDownFuncWait := make(chan struct{})
 	shutDownFuncs := make([]func() error, 0)
 
-	// logger initializes a new logger instance using slog with a JSON handler
-	// that outputs to the standard output (os.Stdout). The handler options are
-	// set to the default values.
+	// logger is initalized slog JSON Handler, and we set it into
+	// slog's default so that can be referenced directly
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		AddSource: true,
 		Level:     slog.LevelInfo,
 	}))
-	helper.InitLogger(logger)
+	slog.SetDefault(logger)
+
+	// Initialize context
+	ctx := context.Background()
 
 	// Initialize the configuration
 	err := config.Load()
 	if err != nil {
 		logger.Error("Error initializing config", "error", err)
-		os.Exit(1)
+		panic(err)
 	}
 
 	// Get the configuration
 	cfg := config.GetConfig()
+
 	// start jwt service here
-	err = auth.LoadJWTService(cfg.JWT.Secret)
+	err = auth.LoadJWTService(ctx, cfg.JWT.Secret)
 	if err != nil {
 		logger.Error("error while initializing JWT service", "error", err)
 		panic(err)
@@ -59,9 +63,14 @@ func main() {
 
 	// Initialize the database and add the close function
 	// on shutdown by adding it to the shutdown functions
-	// db.SetDB(nil)
-	// _, close := db.GetDb()
-	// shutDownFuncs = append(shutDownFuncs, close)
+	err = db.Init(ctx, cfg.Database)
+	if err != nil {
+		logger.Error("error while initializing database service", "error", err)
+		panic(err)
+	}
+
+	// add db close to shutDown funcs
+	shutDownFuncs = append(shutDownFuncs, db.GetInstance().Close)
 
 	r := mux.NewRouter()
 
@@ -127,11 +136,11 @@ func main() {
 	<-c
 
 	// Create a context with a timeout of 5 seconds
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctxWTO, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// shut down the server
-	if err := srv.Shutdown(ctx); err != nil {
+	if err := srv.Shutdown(ctxWTO); err != nil {
 		log.Fatalf("Server shutdown failed: %v", err)
 	}
 

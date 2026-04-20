@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/shubhvish4495/basilisk/pkg/user"
+	"basilisk/pkg/user"
 )
 
 func TestCheckAccessBasedOnRole(t *testing.T) {

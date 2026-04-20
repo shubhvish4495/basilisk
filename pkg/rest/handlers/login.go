@@ -1,11 +1,12 @@
 package handlers
 
 import (
+	"log/slog"
 	"net/http"
 
-	"github.com/shubhvish4495/basilisk/pkg/auth"
-	"github.com/shubhvish4495/basilisk/pkg/helper"
-	"github.com/shubhvish4495/basilisk/pkg/user"
+	"basilisk/pkg/auth"
+	"basilisk/pkg/db"
+	"basilisk/pkg/helper"
 )
 
 // Login handles the user login process, generates a JWT token for the user,
@@ -22,24 +23,16 @@ import (
 //
 // nolint:errcheck
 func Login(w http.ResponseWriter, r *http.Request) {
-	user := user.User{
-		Username: "test-user",
-		Roles: []user.Role{
-			{
-				Service:   "service-name",
-				Resource:  "resource-name",
-				Operation: user.Admin,
-			},
-		},
+	user := db.User{
+		ID: "random-user-uuid",
 	}
 	t, err := auth.JWTServiceInstance.GenerateToken(user)
 	if err != nil {
-		helper.GetLogger().Error("Error generating token", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal server error"))
+		slog.Error("Error generating token", "error", err)
+		helper.SendError(w, helper.InternalServerError)
 		return
 	}
 
-	helper.GetLogger().Info("User logged in")
-	helper.SendSuccess(w, http.StatusOK, t)
+	slog.Info("User logged in")
+	helper.SendSuccessResponse(w, http.StatusOK, t)
 }
