@@ -2,7 +2,7 @@
 .PHONY: all build build-linux run lint clean install-lint test docker-build docker-run
 
 # Go parameters
-BINARY_NAME=basilik
+BINARY_NAME=basilisk
 BUILD_DIR=bin
 GOLANGCI_LINT_URL=github.com/golangci/golangci-lint/cmd/golangci-lint@v1.63.4
 SRC=$(shell find . -type f -name '*.go')
