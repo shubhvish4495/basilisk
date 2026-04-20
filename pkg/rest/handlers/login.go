@@ -26,13 +26,27 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	user := db.User{
 		ID: "random-user-uuid",
 	}
-	t, err := auth.JWTServiceInstance.GenerateToken(user)
+
+	// generate token
+	t, expiresAt, err := auth.JWTServiceInstance.GenerateToken(user)
 	if err != nil {
 		slog.Error("Error generating token", "error", err)
 		helper.SendError(w, helper.InternalServerError)
 		return
 	}
 
+	//generate refresh token
+	rfTkn, err := auth.JWTServiceInstance.GenerateRefreshToken(user.ID)
+	if err != nil {
+		slog.Error("error while generating refresh token")
+		helper.SendError(w, helper.InternalServerError)
+		return
+	}
+
 	slog.Info("User logged in")
-	helper.SendSuccessResponse(w, http.StatusOK, t)
+	helper.SendSuccessResponse(w, http.StatusOK, map[string]any{
+		"token":         t,
+		"expires_at":    expiresAt,
+		"refresh_token": rfTkn,
+	})
 }

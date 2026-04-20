@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"basilisk/pkg/auth"
 	"basilisk/pkg/db"
@@ -13,18 +14,29 @@ import (
 
 // MockJWT is a struct to mock jwt service
 type MockJWT struct {
-	token    string
-	errorVar error
-	user     *db.User
+	token        string
+	refreshToken string
+	errorVar     error
+	user         *db.User
 }
 
 // GenerateToken will generate mock token as set in MockJWT struct
-func (m *MockJWT) GenerateToken(u db.User) (string, error) {
-	return m.token, m.errorVar
+func (m *MockJWT) GenerateToken(u db.User) (string, time.Time, error) {
+	return m.token, time.Now().Add(time.Minute * 15), m.errorVar
 }
 
 // ValidateToken will generate mock token as set in MockJWT struct
 func (m *MockJWT) ValidateToken(token string) (string, error) {
+	return m.user.ID, m.errorVar
+}
+
+// GenerateRefreshToken will generate mock refresh token as set in MockJWT struct
+func (m *MockJWT) GenerateRefreshToken(userID string) (string, error) {
+	return m.refreshToken, m.errorVar
+}
+
+// ValidateRefreshToken will validate mock refresh token as set in MockJWT struct
+func (m *MockJWT) ValidateRefreshToken(token string) (string, error) {
 	return m.user.ID, m.errorVar
 }
 

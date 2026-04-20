@@ -13,7 +13,11 @@ import (
 )
 
 const (
-	ownServiceName = "basilisk-auth-service"
+	ownServiceName       = "basilisk-auth-service"
+	TokenTypeAccess      = "access"
+	TokenTypeRefresh     = "refresh"
+	refreshTokenDuration = time.Hour * 24 * 30 // 30 days
+	accessTokenDuration  = time.Hour * 24 * 7  // 1 week
 )
 
 var (
@@ -22,12 +26,15 @@ var (
 
 type OwnClaims struct {
 	jwt.RegisteredClaims
-	db.User `json:"user"`
+	UserID    string `json:"user_id"`
+	TokenType string `json:"type"`
 }
 
 type JWTInterface interface {
 	ValidateToken(token string) (string, error)
-	GenerateToken(user db.User) (string, error)
+	GenerateToken(user db.User) (string, time.Time, error)
+	ValidateRefreshToken(token string) (string, error)
+	GenerateRefreshToken(userID string) (string, error)
 }
 
 type jwtService struct {
@@ -67,7 +74,7 @@ func LoadJWTService(ctx context.Context, secret string) error {
 //   - error: An error if the token is invalid or if there is an error during parsing.
 func (j *jwtService) ValidateToken(token string) (string, error) {
 	claimsData := OwnClaims{}
-	t, err := jwt.ParseWithClaims(token, &claimsData, func(token *jwt.Token) (interface{}, error) {
+	t, err := jwt.ParseWithClaims(token, &claimsData, func(token *jwt.Token) (any, error) {
 		return []byte(j.secret), nil
 	})
 	if err != nil {
@@ -77,6 +84,11 @@ func (j *jwtService) ValidateToken(token string) (string, error) {
 	// if token is not valid return invalid token error
 	if !t.Valid {
 		return "", fmt.Errorf("invalid token")
+	}
+
+	// validate token type is correct
+	if claimsData.TokenType != TokenTypeAccess {
+		return "", fmt.Errorf("invalid token type")
 	}
 
 	// get audience from claims
@@ -90,7 +102,7 @@ func (j *jwtService) ValidateToken(token string) (string, error) {
 		return "", fmt.Errorf("invalid audience")
 	}
 
-	return claimsData.User.ID, nil
+	return claimsData.UserID, nil
 }
 
 // checkTokenAudience checks if the provided audience contains the service's own name.
@@ -119,15 +131,15 @@ func checkTokenAudience(audience jwt.ClaimStrings) bool {
 // Returns:
 //   - string: The signed JWT token as a string.
 //   - error: An error if the token generation fails.
-func (j *jwtService) GenerateToken(user db.User) (string, error) {
+func (j *jwtService) GenerateToken(user db.User) (string, time.Time, error) {
 	claims := OwnClaims{
-		User: db.User{
-			ID: user.ID,
-		},
+		UserID:    user.ID,
+		TokenType: TokenTypeAccess,
 	}
 
 	// populate claims field
-	claims.ExpiresAt = &jwt.NumericDate{Time: time.Now().Add(time.Minute * 15)}
+	expiresAt := time.Now().Add(accessTokenDuration)
+	claims.ExpiresAt = &jwt.NumericDate{Time: expiresAt}
 	claims.IssuedAt = &jwt.NumericDate{Time: time.Now()}
 	claims.Issuer = ownServiceName
 	claims.Audience = jwt.ClaimStrings{ownServiceName}
@@ -135,5 +147,95 @@ func (j *jwtService) GenerateToken(user db.User) (string, error) {
 	claims.NotBefore = &jwt.NumericDate{Time: time.Now()}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedToken, err := token.SignedString([]byte(j.secret))
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	return signedToken, expiresAt, nil
+}
+
+// GenerateRefreshToken generates a long-lived JWT refresh token for the given user.
+// The token includes the user ID as the subject and is valid for 30 days.
+// It is signed using the HS256 signing method.
+//
+// Parameters:
+//   - userID: The unique identifier of the user.
+//
+// Returns:
+//   - string: The signed JWT refresh token.
+//   - error: An error if the token signing fails.
+func (j *jwtService) GenerateRefreshToken(userID string) (string, error) {
+	now := time.Now()
+	expiresAt := now.Add(refreshTokenDuration)
+
+	var claims OwnClaims
+
+	// populate claims field
+	claims.ExpiresAt = &jwt.NumericDate{Time: expiresAt}
+	claims.IssuedAt = &jwt.NumericDate{Time: now}
+	claims.Issuer = ownServiceName
+	claims.Audience = jwt.ClaimStrings{ownServiceName}
+	claims.Subject = userID
+	claims.NotBefore = &jwt.NumericDate{Time: now}
+	claims.TokenType = TokenTypeRefresh
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(j.secret))
+}
+
+// ValidateRefreshToken validates a JWT refresh token string.
+// It parses and verifies the token's signature, expiration, issuer, audience,
+// and token type. If valid, it returns the user UUID stored in the subject claim.
+//
+// Parameters:
+//   - token: A string representing the JWT refresh token to be validated.
+//
+// Returns:
+//   - string: The user UUID extracted from the token's subject claim.
+//   - error: An error if the token is invalid, expired, or missing required claims.
+func (j *jwtService) ValidateRefreshToken(token string) (string, error) {
+	// Parse the token with standard claims
+	claims := OwnClaims{}
+	t, err := jwt.ParseWithClaims(token, &claims, func(token *jwt.Token) (any, error) {
+		return []byte(j.secret), nil
+	})
+
+	if err != nil {
+		if err == jwt.ErrTokenExpired {
+			return "", fmt.Errorf("refresh token has expired")
+		}
+		return "", fmt.Errorf("invalid refresh token: %w", err)
+	}
+
+	// Check token validity
+	if !t.Valid {
+		return "", fmt.Errorf("invalid refresh token")
+	}
+
+	// Verify issuer
+	if claims.Issuer != ownServiceName {
+		return "", fmt.Errorf("invalid issuer")
+	}
+
+	// if token not of refresh type throw error
+	if claims.TokenType != TokenTypeRefresh {
+		return "", fmt.Errorf("invalid token type")
+	}
+
+	// Verify audience
+	aud, err := claims.GetAudience()
+	if err != nil {
+		return "", fmt.Errorf("error getting audience: %w", err)
+	}
+	if !checkTokenAudience(aud) {
+		return "", fmt.Errorf("invalid audience")
+	}
+
+	// Get and verify subject (user UUID)
+	userUUID := claims.Subject
+	if userUUID == "" {
+		return "", fmt.Errorf("missing user UUID in refresh token")
+	}
+
+	return userUUID, nil
 }
