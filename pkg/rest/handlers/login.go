@@ -1,52 +1,51 @@
 package handlers
 
 import (
-	"log/slog"
-	"net/http"
-
 	"basilisk/pkg/auth"
 	"basilisk/pkg/db"
 	"basilisk/pkg/helper"
+	"encoding/json"
+	"net/http"
 )
 
-// Login handles the user login process, generates a JWT token for the user,
-// and writes it to the response. If there is an error during token generation,
-// it responds with an internal server error status.
-//
-// Parameters:
-//   - w: http.ResponseWriter to write the response.
-//   - r: *http.Request containing the login request.
-//
-// Response:
-//   - 200 OK: If the token is successfully generated, the token is written to the response.
-//   - 500 Internal Server Error: If there is an error during token generation.
-//
-// nolint:errcheck
-func Login(w http.ResponseWriter, r *http.Request) {
-	user := db.User{
-		ID: "random-user-uuid",
-	}
+type GoogleLoginReqBody struct {
+	IDToken string `json:"id_token"`
+}
 
-	// generate token
-	t, expiresAt, err := auth.JWTServiceInstance.GenerateToken(user)
+func GoogleLogin(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	logger := helper.GetLogger(ctx)
+
+	var reqBdy GoogleLoginReqBody
+	err := json.NewDecoder(r.Body).Decode(&reqBdy)
 	if err != nil {
-		slog.Error("Error generating token", "error", err)
+		logger.Error("error while decoding request body", "error", err)
 		helper.SendError(w, helper.InternalServerError)
 		return
 	}
 
-	//generate refresh token
-	rfTkn, err := auth.JWTServiceInstance.GenerateRefreshToken(user.ID)
+	gUserDet, err := auth.GoogleAuthInstance.ValidateIDToken(ctx, logger, reqBdy.IDToken)
 	if err != nil {
-		slog.Error("error while generating refresh token")
-		helper.SendError(w, helper.InternalServerError)
+		helper.SendError(w, helper.UnauthorizedError)
 		return
 	}
 
-	slog.Info("User logged in")
-	helper.SendSuccessResponse(w, http.StatusOK, map[string]any{
-		"token":         t,
-		"expires_at":    expiresAt,
-		"refresh_token": rfTkn,
+	token, exp, err := auth.JWTServiceInstance.GenerateToken(db.User{
+		Name:       gUserDet.Name,
+		Email:      gUserDet.Email,
+		ProfilePic: gUserDet.Picture,
+		SingUpType: db.GoogleAuthType,
 	})
+	if err != nil {
+		helper.SendError(w, helper.InternalServerError)
+		return
+	}
+
+	refreshTkn, err := auth.JWTServiceInstance.GenerateRefreshToken(gUserDet.ID)
+	if err != nil {
+		helper.SendError(w, helper.InternalServerError)
+		return
+	}
+
+	helper.SendSuccessResponse(w, http.StatusOK, map[string]any{"token": token, "expiry": exp, "refresh_token": refreshTkn})
 }

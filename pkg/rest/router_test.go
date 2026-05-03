@@ -5,9 +5,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gorilla/mux"
 	"basilisk/pkg/auth"
 	"basilisk/pkg/rest/handlers"
+
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -28,23 +29,6 @@ func TestRegisterRoutes(t *testing.T) {
 			method:  http.MethodGet,
 			path:    "/api/v1/health",
 			handler: handlers.HealthCheck,
-		},
-		{
-			name:    "Login - No Error",
-			method:  http.MethodGet,
-			path:    "/api/v1/login",
-			handler: handlers.Login,
-			jwtDetails: &MockJWT{
-				token:    "correct-token",
-				errorVar: nil,
-			},
-		},
-		{
-			name:       "GetUsers",
-			method:     http.MethodGet,
-			path:       "/api/v1/users",
-			handler:    handlers.GetUsers,
-			middleware: true,
 		},
 	}
 

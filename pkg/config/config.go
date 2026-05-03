@@ -6,13 +6,15 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"basilisk/pkg/auth"
 	"basilisk/pkg/db"
 )
 
 type Config struct {
-	TlsConfig TlsConfig `yaml:"tlsConfig"`
-	Database  db.Config `yaml:"database"`
-	JWT       JWT       `yaml:"jwt"`
+	TlsConfig    TlsConfig         `yaml:"tlsConfig"`
+	Database     db.Config         `yaml:"database"`
+	JWT          JWT               `yaml:"jwt"`
+	GoogleConfig auth.GoogleConfig `yaml:"google"`
 }
 
 type JWT struct {

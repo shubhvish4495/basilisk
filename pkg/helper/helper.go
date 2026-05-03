@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -193,4 +194,9 @@ func HashString(s string) string {
 	hash := sha256.New()
 	hash.Write([]byte(s))
 	return hex.EncodeToString(hash.Sum(nil))
+}
+
+func GetLogger(ctx context.Context) *slog.Logger {
+	requestId, _ := GetRequestIdFromContext(ctx)
+	return slog.Default().With("request_id", requestId)
 }

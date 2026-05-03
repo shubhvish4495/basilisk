@@ -61,6 +61,12 @@ func main() {
 		panic(err)
 	}
 
+	// start google auth service
+	err = auth.GoogleAuthInit(&cfg.GoogleConfig)
+	if err != nil {
+		logger.Error("error while initializing Google Auth service", "error", err)
+		panic(err)
+	}
 	// Initialize the database and add the close function
 	// on shutdown by adding it to the shutdown functions
 	err = db.Init(ctx, cfg.Database)
