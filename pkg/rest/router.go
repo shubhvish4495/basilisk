@@ -19,12 +19,13 @@ func RegisterRoutes(r *mux.Router) {
 		HandlerFunc(handlers.HealthCheck).
 		Name("healthCheck")
 
+	s.Path("/login/google").
+		Methods(http.MethodPost).
+		HandlerFunc(handlers.GoogleLogin).
+		Name("Google Login")
+
 	// protected routes
 	p := s.PathPrefix("").Subrouter()
 	p.Use(AuthMiddleware)
 
-	p.Path("/login/google").
-		Methods(http.MethodPost).
-		HandlerFunc(handlers.GoogleLogin).
-		Name("Google Login")
 }

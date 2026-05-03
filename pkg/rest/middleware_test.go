@@ -21,7 +21,7 @@ type MockJWT struct {
 }
 
 // GenerateToken will generate mock token as set in MockJWT struct
-func (m *MockJWT) GenerateToken(u db.User) (string, time.Time, error) {
+func (m *MockJWT) GenerateToken(userID string) (string, time.Time, error) {
 	return m.token, time.Now().Add(time.Minute * 15), m.errorVar
 }
 

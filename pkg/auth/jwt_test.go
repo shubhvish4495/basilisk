@@ -6,8 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"basilisk/pkg/db"
-
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 )
@@ -55,36 +53,22 @@ func TestInit(t *testing.T) {
 func TestJWTService_GenerateToken(t *testing.T) {
 	setupTest(t)
 
-	testUser := db.User{
-		ID:   "user-123",
-		Name: "testuser",
-		Roles: []string{
-			"test-service:test-resource:read",
-		},
-	}
-
 	t.Run("Generate valid token", func(t *testing.T) {
-		token, _, err := JWTServiceInstance.GenerateToken(testUser)
+		token, _, err := JWTServiceInstance.GenerateToken("user-123")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, token)
 
 		// Validate the generated token
 		userID, err := JWTServiceInstance.ValidateToken(token)
 		assert.NoError(t, err)
-		assert.Equal(t, testUser.ID, userID)
+		assert.Equal(t, "user-123", userID)
 	})
 }
 
 func TestJWTService_ValidateToken(t *testing.T) {
 	setupTest(t)
 
-	testUser := db.User{
-		ID:   "user-123",
-		Name: "testuser",
-		Roles: []string{
-			"test-service:test-resource:read",
-		},
-	}
+	testUserID := "user-123"
 
 	tests := []struct {
 		name      string
@@ -94,7 +78,7 @@ func TestJWTService_ValidateToken(t *testing.T) {
 		{
 			name: "Valid token",
 			setupFunc: func() string {
-				token, _, _ := JWTServiceInstance.GenerateToken(testUser)
+				token, _, _ := JWTServiceInstance.GenerateToken(testUserID)
 				return token
 			},
 			wantErr: false,
@@ -103,7 +87,7 @@ func TestJWTService_ValidateToken(t *testing.T) {
 			name: "Expired token",
 			setupFunc: func() string {
 				claims := OwnClaims{
-					UserID: testUser.ID,
+					UserID: testUserID,
 					RegisteredClaims: jwt.RegisteredClaims{
 						ExpiresAt: &jwt.NumericDate{Time: time.Now().Add(-time.Hour)},
 						IssuedAt:  &jwt.NumericDate{Time: time.Now().Add(-time.Hour * 2)},
@@ -123,7 +107,7 @@ func TestJWTService_ValidateToken(t *testing.T) {
 			name: "Invalid audience",
 			setupFunc: func() string {
 				claims := OwnClaims{
-					UserID: testUser.ID,
+					UserID: testUserID,
 					RegisteredClaims: jwt.RegisteredClaims{
 						ExpiresAt: &jwt.NumericDate{Time: time.Now().Add(time.Hour)},
 						IssuedAt:  &jwt.NumericDate{Time: time.Now()},
@@ -157,7 +141,7 @@ func TestJWTService_ValidateToken(t *testing.T) {
 				assert.Empty(t, userID)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, testUser.ID, userID)
+				assert.Equal(t, testUserID, userID)
 			}
 		})
 	}
@@ -202,15 +186,7 @@ func TestCheckTokenAudience(t *testing.T) {
 func TestJWTService_TokenClaims(t *testing.T) {
 	setupTest(t)
 
-	testUser := db.User{
-		ID:   "user-123",
-		Name: "testuser",
-		Roles: []string{
-			"test-service:test-resource:read",
-		},
-	}
-
-	token, exp, err := JWTServiceInstance.GenerateToken(testUser)
+	token, exp, err := JWTServiceInstance.GenerateToken("user-123")
 	assert.NoError(t, err)
 
 	// Parse the token without validation to check claims
@@ -232,7 +208,86 @@ func TestJWTService_TokenClaims(t *testing.T) {
 	assert.NotNil(t, exp)
 
 	// Verify user details in claims
-	assert.Equal(t, testUser.ID, claims.UserID)
+	assert.Equal(t, "user-123", claims.UserID)
+}
+
+func TestJWTService_GenerateRefreshToken(t *testing.T) {
+	setupTest(t)
+
+	t.Run("Generate valid refresh token", func(t *testing.T) {
+		token, err := JWTServiceInstance.GenerateRefreshToken("user-123")
+		assert.NoError(t, err)
+		assert.NotEmpty(t, token)
+	})
+}
+
+func TestJWTService_ValidateRefreshToken(t *testing.T) {
+	setupTest(t)
+
+	tests := []struct {
+		name       string
+		setupFunc  func() string
+		wantErr    bool
+		wantUserID string
+	}{
+		{
+			name: "Valid refresh token",
+			setupFunc: func() string {
+				token, _ := JWTServiceInstance.GenerateRefreshToken("user-123")
+				return token
+			},
+			wantErr:    false,
+			wantUserID: "user-123",
+		},
+		{
+			name: "Expired refresh token",
+			setupFunc: func() string {
+				claims := OwnClaims{
+					TokenType: TokenTypeRefresh,
+					RegisteredClaims: jwt.RegisteredClaims{
+						ExpiresAt: &jwt.NumericDate{Time: time.Now().Add(-time.Hour)},
+						IssuedAt:  &jwt.NumericDate{Time: time.Now().Add(-time.Hour * 2)},
+						NotBefore: &jwt.NumericDate{Time: time.Now().Add(-time.Hour * 2)},
+						Issuer:    ownServiceName,
+						Subject:   "user-123",
+						Audience:  jwt.ClaimStrings{ownServiceName},
+					},
+				}
+				token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+				tokenString, _ := token.SignedString([]byte("test-secret"))
+				return tokenString
+			},
+			wantErr: true,
+		},
+		{
+			name: "Access token used as refresh token",
+			setupFunc: func() string {
+				token, _, _ := JWTServiceInstance.GenerateToken("user-123")
+				return token
+			},
+			wantErr: true,
+		},
+		{
+			name: "Invalid token string",
+			setupFunc: func() string {
+				return "not-a-valid-token"
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			token := tt.setupFunc()
+			userID, err := JWTServiceInstance.ValidateRefreshToken(token)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.wantUserID, userID)
+			}
+		})
+	}
 }
 
 func TestJWTService_SecretDecoding(t *testing.T) {

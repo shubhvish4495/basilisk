@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"basilisk/pkg/auth"
-	"basilisk/pkg/db"
 	"basilisk/pkg/helper"
 	"encoding/json"
 	"net/http"
@@ -30,12 +29,7 @@ func GoogleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, exp, err := auth.JWTServiceInstance.GenerateToken(db.User{
-		Name:       gUserDet.Name,
-		Email:      gUserDet.Email,
-		ProfilePic: gUserDet.Picture,
-		SingUpType: db.GoogleAuthType,
-	})
+	token, exp, err := auth.JWTServiceInstance.GenerateToken(gUserDet.ID)
 	if err != nil {
 		helper.SendError(w, helper.InternalServerError)
 		return

@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-
-	"basilisk/pkg/db"
 )
 
 const (
@@ -32,7 +30,7 @@ type OwnClaims struct {
 
 type JWTInterface interface {
 	ValidateToken(token string) (string, error)
-	GenerateToken(user db.User) (string, time.Time, error)
+	GenerateToken(userID string) (string, time.Time, error)
 	ValidateRefreshToken(token string) (string, error)
 	GenerateRefreshToken(userID string) (string, error)
 }
@@ -120,20 +118,20 @@ func checkTokenAudience(audience jwt.ClaimStrings) bool {
 	return slices.Contains(audience, ownServiceName)
 }
 
-// GenerateToken generates a JWT token for the given user.
-// The token includes custom claims such as user details, expiration time,
+// GenerateToken generates a JWT token for the given user ID.
+// The token includes custom claims such as user ID, expiration time,
 // issued at time, issuer, audience, subject, and not before time.
 // The token is signed using the HS256 signing method and a secret key.
 //
 // Parameters:
-//   - user: The user for whom the token is being generated.
+//   - userID: The unique identifier of the user.
 //
 // Returns:
 //   - string: The signed JWT token as a string.
 //   - error: An error if the token generation fails.
-func (j *jwtService) GenerateToken(user db.User) (string, time.Time, error) {
+func (j *jwtService) GenerateToken(userID string) (string, time.Time, error) {
 	claims := OwnClaims{
-		UserID:    user.ID,
+		UserID:    userID,
 		TokenType: TokenTypeAccess,
 	}
 

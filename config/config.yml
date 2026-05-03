@@ -10,3 +10,6 @@ database:
   sslMode: "disable"
 jwt:
   secret: "${JWT_SECRET}"
+google:
+  auth_secret: "${GOOGLE_AUTH_SECRET}"
+  auth_client_id: "${GOOGLE_AUTH_CLIENT_ID}"
