@@ -1,45 +1,45 @@
 package handlers
 
 import (
+	"basilisk/pkg/auth"
+	"basilisk/pkg/helper"
+	"encoding/json"
 	"net/http"
-
-	"github.com/shubhvish4495/basilisk/pkg/auth"
-	"github.com/shubhvish4495/basilisk/pkg/helper"
-	"github.com/shubhvish4495/basilisk/pkg/user"
 )
 
-// Login handles the user login process, generates a JWT token for the user,
-// and writes it to the response. If there is an error during token generation,
-// it responds with an internal server error status.
-//
-// Parameters:
-//   - w: http.ResponseWriter to write the response.
-//   - r: *http.Request containing the login request.
-//
-// Response:
-//   - 200 OK: If the token is successfully generated, the token is written to the response.
-//   - 500 Internal Server Error: If there is an error during token generation.
-//
-// nolint:errcheck
-func Login(w http.ResponseWriter, r *http.Request) {
-	user := user.User{
-		Username: "test-user",
-		Roles: []user.Role{
-			{
-				Service:   "service-name",
-				Resource:  "resource-name",
-				Operation: user.Admin,
-			},
-		},
-	}
-	t, err := auth.JWTServiceInstance.GenerateToken(user)
+type GoogleLoginReqBody struct {
+	IDToken string `json:"id_token"`
+}
+
+func GoogleLogin(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	logger := helper.GetLogger(ctx)
+
+	var reqBdy GoogleLoginReqBody
+	err := json.NewDecoder(r.Body).Decode(&reqBdy)
 	if err != nil {
-		helper.GetLogger().Error("Error generating token", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal server error"))
+		logger.Error("error while decoding request body", "error", err)
+		helper.SendError(w, helper.InternalServerError)
 		return
 	}
 
-	helper.GetLogger().Info("User logged in")
-	helper.SendSuccess(w, http.StatusOK, t)
+	gUserDet, err := auth.GoogleAuthInstance.ValidateIDToken(ctx, logger, reqBdy.IDToken)
+	if err != nil {
+		helper.SendError(w, helper.UnauthorizedError)
+		return
+	}
+
+	token, exp, err := auth.JWTServiceInstance.GenerateToken(gUserDet.ID)
+	if err != nil {
+		helper.SendError(w, helper.InternalServerError)
+		return
+	}
+
+	refreshTkn, err := auth.JWTServiceInstance.GenerateRefreshToken(gUserDet.ID)
+	if err != nil {
+		helper.SendError(w, helper.InternalServerError)
+		return
+	}
+
+	helper.SendSuccessResponse(w, http.StatusOK, map[string]any{"token": token, "expiry": exp, "refresh_token": refreshTkn})
 }

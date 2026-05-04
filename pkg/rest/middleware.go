@@ -3,14 +3,14 @@ package rest
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"runtime/debug"
 	"strings"
 
 	"github.com/google/uuid"
 
-	"github.com/shubhvish4495/basilisk/pkg/auth"
-	"github.com/shubhvish4495/basilisk/pkg/helper"
+	"basilisk/pkg/auth"
 )
 
 type ctxKey int
@@ -51,9 +51,9 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 			ResponseWriter: w,
 			StatusCode:     http.StatusOK,
 		}
-		helper.GetLogger().Info(fmt.Sprintf("Request: method=%s url=%s, reqID=%s", r.Method, r.URL.Path, uuid))
+		slog.Info(fmt.Sprintf("Request: method=%s url=%s, reqID=%s", r.Method, r.URL.Path, uuid))
 		next.ServeHTTP(wr, r.WithContext(ctx))
-		helper.GetLogger().Info(fmt.Sprintf("Response: status=%d url=%s reqID=%s", wr.StatusCode, r.URL.Path, uuid))
+		slog.Info(fmt.Sprintf("Response: status=%d url=%s reqID=%s", wr.StatusCode, r.URL.Path, uuid))
 	})
 }
 
@@ -77,7 +77,7 @@ func RecoveryMiddleware(next http.Handler) http.Handler {
 		defer func() {
 			if err := recover(); err != nil {
 				// Log the panic details
-				helper.GetLogger().Error("Recovered from panic: %v\nStack Trace:\n%s", err, debug.Stack())
+				slog.Error("Recovered from panic: %v\nStack Trace:\n%s", err, debug.Stack())
 
 				// Send a 500 Internal Server Error response
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -112,14 +112,14 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		// Check if the token is in the format
 		// "Bearer
 		if len(splittedHeader) != 2 && splittedHeader[0] != "Bearer" {
-			helper.GetLogger().Error("Invalid token format")
+			slog.Error("Invalid token format")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		data, err := auth.JWTServiceInstance.ValidateToken(splittedHeader[1])
 		if err != nil {
-			helper.GetLogger().Error("Invalid token", "error", err)
+			slog.Error("Invalid token", "error", err)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
