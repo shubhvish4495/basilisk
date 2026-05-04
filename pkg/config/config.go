@@ -1,16 +1,20 @@
 package config
 
 import (
+	"log/slog"
 	"os"
 
-	"github.com/shubhvish4495/basilisk/pkg/helper"
 	"gopkg.in/yaml.v3"
+
+	"basilisk/pkg/auth"
+	"basilisk/pkg/db"
 )
 
 type Config struct {
-	TlsConfig TlsConfig `yaml:"tlsConfig"`
-	Database  Database  `yaml:"database"`
-	JWT       JWT       `yaml:"jwt"`
+	TlsConfig    TlsConfig         `yaml:"tlsConfig"`
+	Database     db.Config         `yaml:"database"`
+	JWT          JWT               `yaml:"jwt"`
+	GoogleConfig auth.GoogleConfig `yaml:"google"`
 }
 
 type JWT struct {
@@ -22,19 +26,11 @@ type TlsConfig struct {
 	KeyFile  string `yaml:"keyFile"`
 }
 
-type Database struct {
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
-	User     string `yaml:"user"`
-	Password string `yaml:"password"`
-	Name     string `yaml:"name"`
-}
-
 var config *Config
 
 func GetConfig() *Config {
 	if config == nil {
-		helper.GetLogger().Info("No Configuration found. Loading default configuration")
+		slog.Info("No Configuration found. Loading default configuration")
 		if err := Load(); err != nil {
 			panic(err)
 		}

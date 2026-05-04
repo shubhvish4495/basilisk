@@ -2,7 +2,6 @@ package helper
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,31 +15,31 @@ import (
 
 func TestSendError(t *testing.T) {
 	tests := []struct {
-		name       string
-		statusCode int
-		err        error
-		wantBody   ErrorResponse
+		name     string
+		err      HttpError
+		wantCode int
+		wantBody ErrorResponse
 	}{
 		{
-			name:       "With error message",
-			statusCode: http.StatusBadRequest,
-			err:        errors.New("invalid request"),
+			name:     "With bad request error",
+			err:      NewHttpError(http.StatusBadRequest, "invalid request"),
+			wantCode: http.StatusBadRequest,
 			wantBody: ErrorResponse{
 				Error: "invalid request",
 			},
 		},
 		{
-			name:       "Without error message",
-			statusCode: http.StatusInternalServerError,
-			err:        nil,
+			name:     "With nil error defaults to internal server error",
+			err:      nil,
+			wantCode: http.StatusInternalServerError,
 			wantBody: ErrorResponse{
 				Error: "Internal Server Error",
 			},
 		},
 		{
-			name:       "Custom error message",
-			statusCode: http.StatusUnauthorized,
-			err:        errors.New("unauthorized access"),
+			name:     "With unauthorized error",
+			err:      NewHttpError(http.StatusUnauthorized, "unauthorized access"),
+			wantCode: http.StatusUnauthorized,
 			wantBody: ErrorResponse{
 				Error: "unauthorized access",
 			},
@@ -53,10 +52,10 @@ func TestSendError(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			// Call SendError
-			SendError(w, tt.statusCode, tt.err)
+			SendError(w, tt.err)
 
 			// Check status code
-			assert.Equal(t, tt.statusCode, w.Code)
+			assert.Equal(t, tt.wantCode, w.Code)
 
 			// Check Content-Type header
 			assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
@@ -72,7 +71,7 @@ func TestSendError(t *testing.T) {
 	}
 }
 
-func TestSendSuccess(t *testing.T) {
+func TestSendSuccessResponse(t *testing.T) {
 	tests := []struct {
 		name       string
 		statusCode int
@@ -106,8 +105,8 @@ func TestSendSuccess(t *testing.T) {
 			// Create a response recorder
 			w := httptest.NewRecorder()
 
-			// Call SendSuccess
-			SendSuccess(w, tt.statusCode, tt.data)
+			// Call SendSuccessResponse
+			SendSuccessResponse(w, tt.statusCode, tt.data)
 
 			// Check status code
 			assert.Equal(t, tt.statusCode, w.Code)
@@ -143,7 +142,7 @@ func TestSendSuccess(t *testing.T) {
 	}
 }
 
-func TestSendSuccess_LargeData(t *testing.T) {
+func TestSendSuccessResponse_LargeData(t *testing.T) {
 	// Create large data structure
 	largeData := make([]string, 1000)
 	for i := range largeData {
@@ -151,7 +150,7 @@ func TestSendSuccess_LargeData(t *testing.T) {
 	}
 
 	w := httptest.NewRecorder()
-	SendSuccess(w, http.StatusOK, largeData)
+	SendSuccessResponse(w, http.StatusOK, largeData)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
@@ -253,6 +252,137 @@ func TestResponseStructures(t *testing.T) {
 	})
 }
 
+func TestSendPaginatedSuccessResponse(t *testing.T) {
+	w := httptest.NewRecorder()
+	data := []string{"a", "b", "c"}
+	SendPaginatedSuccessResponse(w, http.StatusOK, data, 10, 5)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+	var response PaginatedSuccessResponse
+	err := json.NewDecoder(w.Body).Decode(&response)
+	assert.NoError(t, err)
+	assert.Equal(t, 10, response.Limit)
+	assert.Equal(t, 5, response.Offset)
+	assert.Equal(t, 0, response.TotalCount)
+	assert.Len(t, response.Data.([]interface{}), 3)
+}
+
+func TestSendPaginatedSuccessResponseWithCount(t *testing.T) {
+	w := httptest.NewRecorder()
+	data := []string{"a", "b"}
+	SendPaginatedSuccessResponseWithCount(w, http.StatusOK, data, 42, 10, 20)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+	var response PaginatedSuccessResponse
+	err := json.NewDecoder(w.Body).Decode(&response)
+	assert.NoError(t, err)
+	assert.Equal(t, 42, response.TotalCount)
+	assert.Equal(t, 10, response.Limit)
+	assert.Equal(t, 20, response.Offset)
+	assert.Len(t, response.Data.([]interface{}), 2)
+}
+
+func TestGetLimitAndOffset(t *testing.T) {
+	tests := []struct {
+		name       string
+		query      string
+		wantLimit  int
+		wantOffset int
+	}{
+		{
+			name:       "No params uses defaults",
+			query:      "",
+			wantLimit:  10,
+			wantOffset: 0,
+		},
+		{
+			name:       "Custom limit and offset",
+			query:      "limit=25&offset=50",
+			wantLimit:  25,
+			wantOffset: 50,
+		},
+		{
+			name:       "Only limit provided",
+			query:      "limit=5",
+			wantLimit:  5,
+			wantOffset: 0,
+		},
+		{
+			name:       "Only offset provided",
+			query:      "offset=15",
+			wantLimit:  10,
+			wantOffset: 15,
+		},
+		{
+			name:       "Invalid limit falls back to default",
+			query:      "limit=abc&offset=10",
+			wantLimit:  10,
+			wantOffset: 10,
+		},
+		{
+			name:       "Invalid offset falls back to default",
+			query:      "limit=5&offset=xyz",
+			wantLimit:  5,
+			wantOffset: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodGet, "/?"+tt.query, nil)
+			limit, offset := GetLimitAndOffset(r)
+			assert.Equal(t, tt.wantLimit, limit)
+			assert.Equal(t, tt.wantOffset, offset)
+		})
+	}
+}
+
+func TestBase64DecodeString(t *testing.T) {
+	t.Run("Valid JSON string", func(t *testing.T) {
+		input := `{"key":"value"}`
+		result, err := Base64DecodeString(input)
+		assert.NoError(t, err)
+		assert.JSONEq(t, input, string(result))
+	})
+
+	t.Run("Simple string", func(t *testing.T) {
+		input := `"hello"`
+		result, err := Base64DecodeString(input)
+		assert.NoError(t, err)
+		assert.Equal(t, `"hello"`, string(result))
+	})
+}
+
+func TestHashString(t *testing.T) {
+	t.Run("Consistent hashing", func(t *testing.T) {
+		hash1 := HashString("test")
+		hash2 := HashString("test")
+		assert.Equal(t, hash1, hash2)
+	})
+
+	t.Run("Different inputs produce different hashes", func(t *testing.T) {
+		hash1 := HashString("hello")
+		hash2 := HashString("world")
+		assert.NotEqual(t, hash1, hash2)
+	})
+
+	t.Run("Known SHA256 value", func(t *testing.T) {
+		// SHA256 of "test" is well-known
+		hash := HashString("test")
+		assert.Equal(t, "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", hash)
+	})
+
+	t.Run("Empty string", func(t *testing.T) {
+		hash := HashString("")
+		assert.NotEmpty(t, hash)
+		assert.Len(t, hash, 64) // SHA256 hex is 64 chars
+	})
+}
+
 func TestContentTypeHeader(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -261,13 +391,13 @@ func TestContentTypeHeader(t *testing.T) {
 		{
 			name: "SendError sets content type",
 			testFunc: func(w http.ResponseWriter) {
-				SendError(w, http.StatusBadRequest, errors.New("test error"))
+				SendError(w, NewHttpError(http.StatusBadRequest, "test error"))
 			},
 		},
 		{
-			name: "SendSuccess sets content type",
+			name: "SendSuccessResponse sets content type",
 			testFunc: func(w http.ResponseWriter) {
-				SendSuccess(w, http.StatusOK, "test data")
+				SendSuccessResponse(w, http.StatusOK, "test data")
 			},
 		},
 	}

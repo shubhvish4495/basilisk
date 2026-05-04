@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Basilisk - Google Login Test</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, sans-serif; background: #f5f5f5; padding: 40px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        h1 { margin-bottom: 24px; color: #333; }
+        .card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        label { display: block; font-weight: 600; margin-bottom: 6px; color: #555; }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        #init-btn {
+            background: #4285f4;
+            color: #fff;
+        }
+        #init-btn:hover { background: #3367d6; }
+        #init-btn:disabled { background: #ccc; cursor: not-allowed; }
+        #g_id_signin { margin-top: 16px; }
+        .status {
+            margin-top: 12px;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        .status.info { background: #e3f2fd; color: #1565c0; }
+        .status.success { background: #e8f5e9; color: #2e7d32; }
+        .status.error { background: #fbe9e7; color: #c62828; }
+        .response-block {
+            background: #263238;
+            color: #e0e0e0;
+            padding: 16px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin-top: 12px;
+        }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Basilisk - Google Login Test</h1>
+
+        <div class="card">
+            <label for="client-id">Google Client ID</label>
+            <input type="text" id="client-id" placeholder="your-client-id.apps.googleusercontent.com">
+
+            <label for="api-url">API URL</label>
+            <input type="text" id="api-url" value="http://localhost:4444/api/v1/login/google">
+
+            <button id="init-btn" onclick="initGoogle()">Initialize Google Sign-In</button>
+
+            <div id="signin-container" class="hidden">
+                <div id="g_id_signin"></div>
+            </div>
+
+            <div id="status" class="hidden"></div>
+        </div>
+
+        <div id="response-card" class="card hidden">
+            <label>API Response</label>
+            <div id="response" class="response-block"></div>
+        </div>
+    </div>
+
+    <script src="https://accounts.google.com/gsi/client" async></script>
+    <script>
+        function setStatus(msg, type) {
+            const el = document.getElementById('status');
+            el.className = 'status ' + type;
+            el.textContent = msg;
+            el.classList.remove('hidden');
+        }
+
+        function initGoogle() {
+            const clientId = document.getElementById('client-id').value.trim();
+            if (!clientId) {
+                setStatus('Please enter a Google Client ID.', 'error');
+                return;
+            }
+
+            if (typeof google === 'undefined' || !google.accounts) {
+                setStatus('Google Identity Services library not loaded yet. Wait a moment and retry.', 'error');
+                return;
+            }
+
+            google.accounts.id.initialize({
+                client_id: clientId,
+                callback: handleCredentialResponse,
+            });
+
+            google.accounts.id.renderButton(
+                document.getElementById('g_id_signin'),
+                { theme: 'outline', size: 'large', text: 'signin_with' }
+            );
+
+            document.getElementById('signin-container').classList.remove('hidden');
+            document.getElementById('init-btn').disabled = true;
+            setStatus('Google Sign-In initialized. Click the button below to sign in.', 'info');
+        }
+
+        async function handleCredentialResponse(response) {
+            const idToken = response.credential;
+            setStatus('Got ID token. Calling API...', 'info');
+
+            const apiUrl = document.getElementById('api-url').value.trim();
+
+            try {
+                const res = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id_token: idToken }),
+                });
+
+                const data = await res.json();
+
+                document.getElementById('response').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('response-card').classList.remove('hidden');
+
+                if (res.ok) {
+                    setStatus('Login successful! (HTTP ' + res.status + ')', 'success');
+                } else {
+                    setStatus('API returned HTTP ' + res.status, 'error');
+                }
+            } catch (err) {
+                setStatus('Request failed: ' + err.message, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
