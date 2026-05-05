@@ -76,6 +76,9 @@ The server starts on **port 4444**. If TLS cert files are configured, HTTPS is e
 | `make clean` | Remove build artifacts |
 | `make docker-build` | Build container image |
 | `make docker-run` | Build and run in a container |
+| `make create-migration name=<name>` | Create a new migration file pair |
+| `make migrate-up` | Apply all pending migrations |
+| `make migrate-down` | Roll back all migrations |
 
 ## Configuration
 
