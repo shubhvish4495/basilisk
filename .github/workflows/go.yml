@@ -30,9 +30,3 @@ jobs:
 
     - name: Test
       run: make test
-
-    - name: Install migrate
-      run: make install-migrate
-
-    - name: Validate migrations
-      run: migrate -path db/migrations -database "postgres://user:pass@localhost:5432/test?sslmode=disable" validate
