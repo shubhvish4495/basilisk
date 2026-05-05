@@ -35,4 +35,4 @@ jobs:
       run: make install-migrate
 
     - name: Validate migrations
-      run: migrate -path db/migrations -database "postgres://" version 2>&1 || true
+      run: migrate -path db/migrations -database "postgres://user:pass@localhost:5432/test?sslmode=disable" validate
