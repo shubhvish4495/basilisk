@@ -1,5 +1,8 @@
 # PHONY targets (these don't represent files)
-.PHONY: all build build-linux run lint clean install-lint test docker-build docker-run
+.PHONY: all build build-linux run lint clean install-lint test docker-build docker-run install-migrate create-migration migrate-up migrate-down
+
+# migration directory variable
+MIGRATIONS_DIR=db/migrations
 
 # Go parameters
 BINARY_NAME=basilisk
@@ -14,6 +17,8 @@ endif
 
 # Check if golangci-lint is installed
 GOLANGCI_LINT=$(shell command -v golangci-lint 2>/dev/null)
+MIGRATE=$(shell command -v migrate 2>/dev/null)
+MIGRATE_URL=github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
 # Default target
 all: build
@@ -77,3 +82,41 @@ docker-run: docker-build
 	@echo "+ $@"
 	@echo "    🐳 Running Docker container..."
 	$(CONTAINER_ENGINE) run -it $(BINARY_NAME)
+
+# Database URL for migrations
+DB_URL=postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=$(DB_SSL_MODE)
+
+# Install golang-migrate if not installed
+install-migrate:
+	@echo "+ $@"
+	@if [ -z "$(MIGRATE)" ]; then \
+		echo "    ⚙️  Installing golang-migrate..."; \
+		go install -tags 'postgres' $(MIGRATE_URL); \
+	else \
+		echo "    ✅ golang-migrate is already installed"; \
+	fi
+
+# Create a new migration (usage: make create-migration name=<migration_name>)
+create-migration: install-migrate
+	@echo "+ $@"
+	@if [ -z "$(name)" ]; then \
+		echo "    ❌ Error: please provide a migration name, e.g. make create-migration name=create_users_table"; \
+		exit 1; \
+	fi
+	@mkdir -p $(MIGRATIONS_DIR)
+	@migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(name)
+	@echo "    ✅ Migration files created"
+
+# Run database migrations up
+migrate-up: install-migrate
+	@echo "+ $@"
+	@echo "    ⬆️  Running migrations up..."
+	@migrate -path $(MIGRATIONS_DIR) -database "$(DB_URL)" up
+	@echo "    ✅ Migrations applied"
+
+# Roll back database migrations
+migrate-down: install-migrate
+	@echo "+ $@"
+	@echo "    ⬇️  Running migrations down..."
+	@migrate -path $(MIGRATIONS_DIR) -database "$(DB_URL)" down
+	@echo "    ✅ Migrations rolled back"
