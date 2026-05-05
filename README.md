@@ -16,6 +16,7 @@ Basilisk is a minimal yet powerful Golang project skeleton that provides essenti
 - **Configuration Management** -- YAML config with environment variable substitution.
 - **Graceful Shutdown** -- Signal handling (SIGINT, SIGTERM) with ordered resource cleanup.
 - **TLS Support** -- Automatic HTTPS when certificate files are present.
+- **Database Migrations** -- SQL-based migrations with up/down support. Create, apply, and roll back migrations using Makefile commands.
 - **CPU Profiling** -- Built-in `pprof` profiling via `-pprof` flag.
 - **Docker/Podman Support** -- Build and run via containers with auto-detected engine.
 
@@ -102,6 +103,7 @@ basilisk/
 │   ├── auth/                    # JWT and Google OAuth services
 │   ├── config/                  # Configuration loader
 │   ├── db/                      # Database connection and models
+│   │   └── migrations/          # SQL migration files (up/down pairs)
 │   ├── helper/                  # Response formatting, errors, pagination
 │   └── rest/                    # Router, middleware, and handlers
 ├── .env.example                 # Sample environment variables
