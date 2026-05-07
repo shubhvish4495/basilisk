@@ -3,7 +3,9 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"log/slog"
 
 	_ "github.com/lib/pq"
 
@@ -103,6 +105,39 @@ func Init(ctx context.Context, c Config) error {
 	// set instance of type DBStruct
 	instance = &DBStruct{
 		DB: db,
+	}
+	return nil
+}
+
+// withTransaction executes the given function within a database transaction.
+// It automatically handles beginning, committing, and rolling back the transaction.
+// If the function returns an error, the transaction is rolled back; otherwise, it is committed.
+//
+// Parameters:
+//   - ctx: Context for the transaction
+//   - logger: Logger for recording transaction errors
+//   - fn: The function to execute within the transaction scope
+//
+// Returns:
+//   - error: An error if the transaction fails to begin, commit, or rollback, nil otherwise
+func (db *DBStruct) withTransaction(ctx context.Context, logger *slog.Logger, fn func(logger *slog.Logger, tx *sql.Tx) error) error {
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{})
+	if err != nil {
+		logger.Error("error while starting transaction", "error", err)
+		return err
+	}
+
+	if err = fn(logger, tx); err != nil {
+		rbErr := tx.Rollback()
+		if rbErr != nil {
+			logger.Error("error while rolling back the transaction", "error", rbErr)
+		}
+		return errors.Join(err, rbErr)
+	}
+
+	if err = tx.Commit(); err != nil {
+		logger.Error("error while committing transaction", "error", err)
+		return err
 	}
 
 	return nil
