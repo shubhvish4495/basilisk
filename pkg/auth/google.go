@@ -8,8 +8,12 @@ import (
 	"cloud.google.com/go/auth/credentials/idtoken"
 )
 
+type GoogleAuthInterface interface {
+	ValidateIDToken(ctx context.Context, logger *slog.Logger, idToken string) (*GoogleUser, error)
+}
+
 var (
-	GoogleAuthInstance *GoogleAuth
+	GoogleAuthInstance GoogleAuthInterface
 )
 
 type GoogleConfig struct {
@@ -35,9 +39,10 @@ func GoogleAuthInit(c *GoogleConfig) error {
 		return errors.New("missing google auth secret")
 	}
 
-	GoogleAuthInstance = new(GoogleAuth)
-	GoogleAuthInstance.Secret = c.Secret
-	GoogleAuthInstance.ClientID = c.ClientID
+	GoogleAuthInstance = &GoogleAuth{
+		Secret:   c.Secret,
+		ClientID: c.ClientID,
+	}
 
 	return nil
 }
