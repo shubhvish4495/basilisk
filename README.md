@@ -4,14 +4,27 @@
     <img src="./assets/logo.png" alt="Basilisk Logo" width="150">
 </p>
 
-Basilisk is a minimal yet powerful Golang project skeleton that provides essential features out of the box for building production-ready services.
+Basilisk is a production-ready Golang backend starter kit with authentication, database, migrations, and middleware already wired.
+
+Instead of spending hours setting up boilerplate for every new project, you can get a fully working backend running in minutes.
+
+### Why Basilisk?
+
+Every new backend project usually requires:
+- Setting up JWT auth
+- Integrating Google OAuth
+- Connecting PostgreSQL
+- Writing migrations
+- Adding middleware (logging, recovery, CORS)
+
+Basilisk gives you all of this out of the box — clean, minimal, and extensible.
 
 ## Features
 
 - **Google Auth Login** -- Google authentication is set up and ready to go out of the box. Just update your Google credentials in the `.env` file and implement your database insert/upsert method.
 - **JWT Based Authentication** -- Access and refresh token support with configurable expiry, base64-encoded secrets, and auth middleware for protected routes.
 - **Health Check** -- Built-in health check endpoint to monitor service availability.
-- **PostgreSQL Database** -- Connection pooling with `database/sql` and the `lib/pq` driver.
+- **PostgreSQL Database** -- Connection pooling with `database/sql` and the `lib/pq` driver. Includes a built-in transaction helper (`withTransaction`) that automatically handles begin, commit, and rollback — so your database operations are transactional out of the box.
 - **Middleware Stack** -- Request logging with unique request IDs, panic recovery, CORS, and JWT auth middleware.
 - **Configuration Management** -- YAML config with environment variable substitution.
 - **Graceful Shutdown** -- Signal handling (SIGINT, SIGTERM) with ordered resource cleanup.
