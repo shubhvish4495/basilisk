@@ -32,7 +32,7 @@ type DB interface {
 	Close() error
 
 	// jwt auth required db methods
-	GetUser(ctx context.Context, userID string) (*User, helper.HttpError)
+	GetUser(ctx context.Context, logger *slog.Logger, userID string) (*User, helper.HttpError)
 }
 
 // DBStruct wraps sql.DB and implements the DB interface.

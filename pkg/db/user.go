@@ -3,7 +3,9 @@ package db
 import (
 	"basilisk/pkg/helper"
 	"context"
+	"database/sql"
 	"errors"
+	"log/slog"
 )
 
 type AuthType string
@@ -24,6 +26,12 @@ type User struct {
 	BaseStruct
 }
 
-func (db *DBStruct) GetUser(ctx context.Context, userID string) (*User, helper.HttpError) {
+func (db *DBStruct) GetUser(ctx context.Context, logger *slog.Logger, userID string) (*User, helper.HttpError) {
+	//mock transactional method call for building
+	_ = db.withTransaction(ctx, logger, func(logger *slog.Logger, tx *sql.Tx) error {
+		//dummy function
+		return nil
+	})
+
 	return nil, helper.NewHttpError(helper.InternalServerError.Code, errors.New("missing implementation").Error())
 }
