@@ -58,8 +58,10 @@ func TestGoogleAuthInit(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, GoogleAuthInstance)
-				assert.Equal(t, tt.config.Secret, GoogleAuthInstance.Secret)
-				assert.Equal(t, tt.config.ClientID, GoogleAuthInstance.ClientID)
+				ga, ok := GoogleAuthInstance.(*GoogleAuth)
+				assert.True(t, ok)
+				assert.Equal(t, tt.config.Secret, ga.Secret)
+				assert.Equal(t, tt.config.ClientID, ga.ClientID)
 			}
 		})
 	}
