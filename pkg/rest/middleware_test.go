@@ -9,6 +9,7 @@ import (
 	"basilisk/pkg/auth"
 	"basilisk/pkg/db"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,7 +28,7 @@ func (m *MockJWT) GenerateToken(userID string) (string, time.Time, error) {
 
 // ValidateToken will generate mock token as set in MockJWT struct
 func (m *MockJWT) ValidateToken(token string) (string, error) {
-	return m.user.ID, m.errorVar
+	return m.user.ID.String(), m.errorVar
 }
 
 // GenerateRefreshToken will generate mock refresh token as set in MockJWT struct
@@ -37,7 +38,7 @@ func (m *MockJWT) GenerateRefreshToken(userID string) (string, error) {
 
 // ValidateRefreshToken will validate mock refresh token as set in MockJWT struct
 func (m *MockJWT) ValidateRefreshToken(token string) (string, error) {
-	return m.user.ID, m.errorVar
+	return m.user.ID.String(), m.errorVar
 }
 
 func TestLoggingMiddleware(t *testing.T) {
@@ -79,12 +80,13 @@ func TestAuthMiddleware_ValidToken(t *testing.T) {
 	middleware := AuthMiddleware(handler)
 
 	validToken := "valid-token"
+	mockUser := &db.User{
+		Name: "test-user",
+	}
+	mockUser.ID = uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	auth.JWTServiceInstance = &MockJWT{
 		token: validToken,
-		user: &db.User{
-			ID:   "mock-id",
-			Name: "test-user",
-		},
+		user:  mockUser,
 	}
 
 	req := httptest.NewRequest("GET", "http://example.com/foo", nil)
@@ -104,7 +106,9 @@ func TestAuthMiddleware_InvalidToken(t *testing.T) {
 	middleware := AuthMiddleware(handler)
 
 	invalidToken := "invalid-token"
-	auth.JWTServiceInstance = &MockJWT{token: "valid-token", errorVar: assert.AnError, user: &db.User{ID: "mock-id"}}
+	mockUser2 := &db.User{}
+	mockUser2.ID = uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	auth.JWTServiceInstance = &MockJWT{token: "valid-token", errorVar: assert.AnError, user: mockUser2}
 
 	req := httptest.NewRequest("GET", "http://example.com/foo", nil)
 	req.Header.Set("Authorization", "Bearer "+invalidToken)

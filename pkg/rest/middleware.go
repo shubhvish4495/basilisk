@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,14 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"basilisk/pkg/auth"
-)
-
-type ctxKey int
-
-const (
-	uuidKey ctxKey = iota
-	userKey
-	userRoleKey
+	"basilisk/pkg/helper"
 )
 
 type CustomResponseLogger struct {
@@ -46,7 +38,7 @@ func (c *CustomResponseLogger) WriteHeader(code int) {
 func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		uuid := uuid.New()
-		ctx := context.WithValue(r.Context(), uuidKey, uuid)
+		ctx := helper.SetRequestIdToContext(r.Context(), uuid.String())
 		wr := &CustomResponseLogger{
 			ResponseWriter: w,
 			StatusCode:     http.StatusOK,
@@ -124,7 +116,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), userKey, data)
+		ctx := helper.SetUserToContext(r.Context(), data)
 		// Call the next handler in the chain
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
