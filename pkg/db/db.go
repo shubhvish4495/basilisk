@@ -7,7 +7,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	_ "github.com/lib/pq"
+	"github.com/google/uuid"
+	"github.com/lib/pq"
 
 	"basilisk/pkg/helper"
 )
@@ -32,7 +33,9 @@ type DB interface {
 	Close() error
 
 	// jwt auth required db methods
-	GetUser(ctx context.Context, logger *slog.Logger, userID string) (*User, helper.HttpError)
+	GetUserByEmail(ctx context.Context, logger *slog.Logger, emailID string) (*User, helper.HttpError)
+	GetUserByID(ctx context.Context, logger *slog.Logger, userID string) (*User, helper.HttpError)
+	CreateUser(ctx context.Context, logger *slog.Logger, user User) (uuid.UUID, helper.HttpError)
 }
 
 // DBStruct wraps sql.DB and implements the DB interface.
@@ -141,4 +144,41 @@ func (db *DBStruct) withTransaction(ctx context.Context, logger *slog.Logger, fn
 	}
 
 	return nil
+}
+
+func (db *DBStruct) insertReturningID(ctx context.Context, logger *slog.Logger, query string, args ...any) (uuid.UUID, helper.HttpError) {
+	logger.Debug("running query to insert into database", "query", query)
+
+	var id uuid.UUID
+	err := db.QueryRowContext(ctx, query, args...).Scan(&id)
+	if err != nil {
+		logger.Error("error while inserting into database", "error", err)
+		var pgErr *pq.Error
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23505" { // Unique violation
+				return uuid.Nil, helper.NewHttpError(helper.ConflictError.Code, "data already exist in db")
+			}
+		}
+		return uuid.Nil, helper.InternalServerError
+	}
+
+	return id, nil
+}
+
+func (db *DBStruct) getSingleRow(ctx context.Context, logger *slog.Logger, query string, args ...any) (*sql.Row, helper.HttpError) {
+	logger.Debug("running query to get data from database", "query", query)
+
+	row := db.QueryRowContext(ctx, query, args...)
+	if row.Err() != nil {
+		logger.Error("error while querying in row from database", "error", row.Err().Error())
+		return nil, helper.InternalServerError
+	}
+
+	return row, nil
+}
+
+func (db *DBStruct) DummyTxMethod(ctx context.Context, logger *slog.Logger) {
+	_ = db.withTransaction(ctx, logger, func(logger *slog.Logger, tx *sql.Tx) error {
+		return nil
+	})
 }

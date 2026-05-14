@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,10 +12,11 @@ import (
 	"time"
 
 	"basilisk/pkg/auth"
+	"basilisk/pkg/db"
 	"basilisk/pkg/helper"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
-	"log/slog"
 )
 
 type mockGoogleAuth struct {
@@ -49,12 +51,46 @@ func (m *mockJWT) ValidateRefreshToken(_ string) (string, error) {
 	return "", nil
 }
 
+type mockDB struct {
+	user    *db.User
+	httpErr helper.HttpError
+	userID  uuid.UUID
+}
+
+func (m *mockDB) Ping() error                        { return nil }
+func (m *mockDB) PingContext(_ context.Context) error { return nil }
+func (m *mockDB) Close() error                       { return nil }
+
+func (m *mockDB) GetUserByEmail(_ context.Context, _ *slog.Logger, _ string) (*db.User, helper.HttpError) {
+	return m.user, m.httpErr
+}
+
+func (m *mockDB) GetUserByID(_ context.Context, _ *slog.Logger, _ string) (*db.User, helper.HttpError) {
+	return m.user, m.httpErr
+}
+
+func (m *mockDB) CreateUser(_ context.Context, _ *slog.Logger, _ db.User) (uuid.UUID, helper.HttpError) {
+	return m.userID, m.httpErr
+}
+
 func TestGoogleLogin(t *testing.T) {
+	isVerified := true
+	testUserID := uuid.New()
+	validUser := &db.User{
+		Name:       "Test User",
+		Email:      "test@example.com",
+		ProfilePic: "pic.png",
+		SignUpType:  db.GoogleAuthType,
+		IsVerified: &isVerified,
+	}
+	validUser.ID = testUserID
+
 	tests := []struct {
 		name           string
 		body           string
 		googleAuth     auth.GoogleAuthInterface
 		jwt            auth.JWTInterface
+		mockDB         *mockDB
 		wantStatusCode int
 		wantErrMsg     string
 	}{
@@ -68,6 +104,7 @@ func TestGoogleLogin(t *testing.T) {
 				token:        "access-token",
 				refreshToken: "refresh-token",
 			},
+			mockDB:         &mockDB{user: validUser},
 			wantStatusCode: http.StatusOK,
 		},
 		{
@@ -75,6 +112,7 @@ func TestGoogleLogin(t *testing.T) {
 			body:           `{invalid-json`,
 			googleAuth:     &mockGoogleAuth{},
 			jwt:            &mockJWT{},
+			mockDB:         &mockDB{},
 			wantStatusCode: http.StatusInternalServerError,
 			wantErrMsg:     "Internal Server Error",
 		},
@@ -85,6 +123,7 @@ func TestGoogleLogin(t *testing.T) {
 				err: errors.New("invalid token"),
 			},
 			jwt:            &mockJWT{},
+			mockDB:         &mockDB{},
 			wantStatusCode: http.StatusUnauthorized,
 			wantErrMsg:     "Unauthorized",
 		},
@@ -92,11 +131,12 @@ func TestGoogleLogin(t *testing.T) {
 			name: "jwt generate token fails",
 			body: `{"id_token":"valid-token"}`,
 			googleAuth: &mockGoogleAuth{
-				user: &auth.GoogleUser{ID: "user-123"},
+				user: &auth.GoogleUser{ID: "user-123", Email: "test@example.com"},
 			},
 			jwt: &mockJWT{
 				tokenErr: errors.New("token generation failed"),
 			},
+			mockDB:         &mockDB{user: validUser},
 			wantStatusCode: http.StatusInternalServerError,
 			wantErrMsg:     "Internal Server Error",
 		},
@@ -104,12 +144,13 @@ func TestGoogleLogin(t *testing.T) {
 			name: "jwt generate refresh token fails",
 			body: `{"id_token":"valid-token"}`,
 			googleAuth: &mockGoogleAuth{
-				user: &auth.GoogleUser{ID: "user-123"},
+				user: &auth.GoogleUser{ID: "user-123", Email: "test@example.com"},
 			},
 			jwt: &mockJWT{
 				token:           "access-token",
 				refreshTokenErr: errors.New("refresh token generation failed"),
 			},
+			mockDB:         &mockDB{user: validUser},
 			wantStatusCode: http.StatusInternalServerError,
 			wantErrMsg:     "Internal Server Error",
 		},
@@ -119,6 +160,7 @@ func TestGoogleLogin(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			auth.GoogleAuthInstance = tt.googleAuth
 			auth.JWTServiceInstance = tt.jwt
+			db.SetInstance(tt.mockDB)
 
 			req := httptest.NewRequest(http.MethodPost, "/login/google", strings.NewReader(tt.body))
 			ctx := helper.SetRequestIdToContext(req.Context(), "test-request-id")
