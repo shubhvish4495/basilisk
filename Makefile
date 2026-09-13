@@ -1,5 +1,5 @@
 # PHONY targets (these don't represent files)
-.PHONY: all build build-linux run lint clean install-lint test docker-build docker-run install-migrate create-migration migrate-up migrate-down
+.PHONY: all build build-linux run lint clean install-lint test docker-build docker-run install-migrate create-migration migrate-up migrate-down fmt
 
 # migration directory variable
 MIGRATIONS_DIR=db/migrations
@@ -120,3 +120,10 @@ migrate-down: install-migrate
 	@echo "    ⬇️  Running migrations down..."
 	@migrate -path $(MIGRATIONS_DIR) -database "$(DB_URL)" down
 	@echo "    ✅ Migrations rolled back"
+
+# Format imports
+fmt:
+	@echo "+ $@"
+	@echo "    🔧 Running goimports..."
+	@goimports -w -local "basilisk" .
+	@echo "    ✅ Imports formatted"

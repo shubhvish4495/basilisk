@@ -7,6 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"basilisk/pkg/auth"
+	"basilisk/pkg/cache"
 	"basilisk/pkg/db"
 )
 
@@ -15,6 +16,7 @@ type Config struct {
 	Database     db.Config         `yaml:"database"`
 	JWT          JWT               `yaml:"jwt"`
 	GoogleConfig auth.GoogleConfig `yaml:"google"`
+	Cache        cache.Config      `yaml:"cache"`
 }
 
 type JWT struct {

@@ -24,8 +24,28 @@ func RegisterRoutes(r *mux.Router) {
 		HandlerFunc(handlers.GoogleLogin).
 		Name("Google Login")
 
+	s.Path("/login").
+		Methods(http.MethodPost).
+		HandlerFunc(handlers.LoginWithPwd).
+		Name("login with pass")
+
 	// protected routes
 	p := s.PathPrefix("").Subrouter()
 	p.Use(AuthMiddleware)
+
+	p.Path("/loggedInReq").
+		Methods(http.MethodGet).
+		HandlerFunc(handlers.LoggedInRequest).
+		Name("Logged In Request")
+
+	p.Path("/logout").
+		Methods(http.MethodPost).
+		HandlerFunc(handlers.LogOutHandler).
+		Name("logout")
+
+	p.Path("/refresh").
+		Methods(http.MethodPost).
+		HandlerFunc(handlers.RefreshTokenHandler).
+		Name("refresh token handler")
 
 }

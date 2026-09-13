@@ -13,8 +13,9 @@ import (
 	"basilisk/pkg/auth"
 	"basilisk/pkg/helper"
 
-	"github.com/stretchr/testify/assert"
 	"log/slog"
+
+	"github.com/stretchr/testify/assert"
 )
 
 type mockGoogleAuth struct {
@@ -27,26 +28,31 @@ func (m *mockGoogleAuth) ValidateIDToken(_ context.Context, _ *slog.Logger, _ st
 }
 
 type mockJWT struct {
-	token           string
-	tokenErr        error
-	refreshToken    string
-	refreshTokenErr error
+	token            string
+	tokenErr         error
+	refreshToken     string
+	refreshTokenErr  error
+	sessionDenailErr error
 }
 
-func (m *mockJWT) GenerateToken(_ string) (string, time.Time, error) {
+func (m *mockJWT) GenerateToken(ctx context.Context, logger *slog.Logger, _, sessionID string) (string, time.Time, error) {
 	return m.token, time.Now().Add(15 * time.Minute), m.tokenErr
 }
 
-func (m *mockJWT) ValidateToken(_ string) (string, error) {
-	return "", nil
+func (m *mockJWT) ValidateToken(ctx context.Context, logger *slog.Logger, _ string) (string, string, error) {
+	return "", "", nil
 }
 
-func (m *mockJWT) GenerateRefreshToken(_ string) (string, error) {
+func (m *mockJWT) GenerateRefreshToken(ctx context.Context, logger *slog.Logger, _, sessionID string) (string, error) {
 	return m.refreshToken, m.refreshTokenErr
 }
 
-func (m *mockJWT) ValidateRefreshToken(_ string) (string, error) {
+func (m *mockJWT) ValidateRefreshToken(ctx context.Context, logger *slog.Logger, _ string) (string, error) {
 	return "", nil
+}
+
+func (m *mockJWT) AddSesssionToDenyList(ctx context.Context, logger *slog.Logger, sessionID string) error {
+	return m.sessionDenailErr
 }
 
 func TestGoogleLogin(t *testing.T) {

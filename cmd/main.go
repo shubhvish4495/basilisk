@@ -14,6 +14,7 @@ import (
 	"github.com/rs/cors"
 
 	"basilisk/pkg/auth"
+	"basilisk/pkg/cache"
 	"basilisk/pkg/config"
 	"basilisk/pkg/db"
 	"basilisk/pkg/helper"
@@ -72,6 +73,12 @@ func main() {
 	err = db.Init(ctx, cfg.Database)
 	if err != nil {
 		logger.Error("error while initializing database service", "error", err)
+		panic(err)
+	}
+
+	err = cache.Init(ctx, cfg.Cache)
+	if err != nil {
+		logger.Error("error while initializing cache service", "error", err)
 		panic(err)
 	}
 

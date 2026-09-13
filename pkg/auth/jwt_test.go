@@ -1,8 +1,12 @@
 package auth
 
 import (
+	"basilisk/pkg/cache"
+	"basilisk/pkg/helper"
 	"context"
 	"encoding/base64"
+	"encoding/json"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -11,12 +15,46 @@ import (
 )
 
 const (
-	testSecret = "dGVzdC1zZWNyZXQ=" // base64 encoded "test-secret"
+	testSecret    = "dGVzdC1zZWNyZXQ=" // base64 encoded "test-secret"
+	mockSessionID = "test-session-id"
 )
+
+type MockCache struct {
+	AddError    error
+	GetError    error
+	DeleteError error
+	Data        []byte
+}
+
+func (m *MockCache) Add(ctx context.Context, logger *slog.Logger, key string, data any, ttl ...time.Duration) error {
+	return m.AddError
+}
+
+func (m *MockCache) Get(ctx context.Context, logger *slog.Logger, key string, target any) error {
+	switch ptr := target.(type) {
+	case *string:
+		*ptr = string(m.Data)
+	case *[]byte:
+		*ptr = m.Data
+	default:
+		if err := json.Unmarshal(m.Data, target); err != nil {
+			logger.Error("error while unmarshalling data", "error", err)
+			return helper.InternalServerError
+		}
+	}
+	return m.GetError
+}
+
+func (m *MockCache) Delete(ctx context.Context, logger *slog.Logger, key string) error {
+	return m.DeleteError
+}
 
 func setupTest(t *testing.T) {
 	err := LoadJWTService(context.Background(), testSecret)
 	assert.NoError(t, err)
+
+	m := MockCache{}
+	cache.SetInstance(&m)
 }
 
 func TestInit(t *testing.T) {
@@ -54,12 +92,12 @@ func TestJWTService_GenerateToken(t *testing.T) {
 	setupTest(t)
 
 	t.Run("Generate valid token", func(t *testing.T) {
-		token, _, err := JWTServiceInstance.GenerateToken("user-123")
+		token, _, err := JWTServiceInstance.GenerateToken(context.TODO(), slog.Default(), "user-123", mockSessionID)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, token)
 
 		// Validate the generated token
-		userID, err := JWTServiceInstance.ValidateToken(token)
+		userID, _, err := JWTServiceInstance.ValidateToken(context.TODO(), slog.Default(), token)
 		assert.NoError(t, err)
 		assert.Equal(t, "user-123", userID)
 	})
@@ -69,6 +107,7 @@ func TestJWTService_ValidateToken(t *testing.T) {
 	setupTest(t)
 
 	testUserID := "user-123"
+	testSessionID := "test-session-id"
 
 	tests := []struct {
 		name      string
@@ -78,7 +117,7 @@ func TestJWTService_ValidateToken(t *testing.T) {
 		{
 			name: "Valid token",
 			setupFunc: func() string {
-				token, _, _ := JWTServiceInstance.GenerateToken(testUserID)
+				token, _, _ := JWTServiceInstance.GenerateToken(context.TODO(), slog.Default(), testUserID, testSessionID)
 				return token
 			},
 			wantErr: false,
@@ -135,7 +174,7 @@ func TestJWTService_ValidateToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			token := tt.setupFunc()
-			userID, err := JWTServiceInstance.ValidateToken(token)
+			userID, _, err := JWTServiceInstance.ValidateToken(context.TODO(), slog.Default(), token)
 			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Empty(t, userID)
@@ -186,7 +225,7 @@ func TestCheckTokenAudience(t *testing.T) {
 func TestJWTService_TokenClaims(t *testing.T) {
 	setupTest(t)
 
-	token, exp, err := JWTServiceInstance.GenerateToken("user-123")
+	token, exp, err := JWTServiceInstance.GenerateToken(context.TODO(), slog.Default(), "user-123", "test-session-id")
 	assert.NoError(t, err)
 
 	// Parse the token without validation to check claims
@@ -215,7 +254,7 @@ func TestJWTService_GenerateRefreshToken(t *testing.T) {
 	setupTest(t)
 
 	t.Run("Generate valid refresh token", func(t *testing.T) {
-		token, err := JWTServiceInstance.GenerateRefreshToken("user-123")
+		token, err := JWTServiceInstance.GenerateRefreshToken(context.TODO(), slog.Default(), "user-123", mockSessionID)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, token)
 	})
@@ -223,6 +262,7 @@ func TestJWTService_GenerateRefreshToken(t *testing.T) {
 
 func TestJWTService_ValidateRefreshToken(t *testing.T) {
 	setupTest(t)
+	sessionId := "test-session-id"
 
 	tests := []struct {
 		name       string
@@ -233,7 +273,7 @@ func TestJWTService_ValidateRefreshToken(t *testing.T) {
 		{
 			name: "Valid refresh token",
 			setupFunc: func() string {
-				token, _ := JWTServiceInstance.GenerateRefreshToken("user-123")
+				token, _ := JWTServiceInstance.GenerateRefreshToken(context.TODO(), slog.Default(), "user-123", mockSessionID)
 				return token
 			},
 			wantErr:    false,
@@ -243,6 +283,7 @@ func TestJWTService_ValidateRefreshToken(t *testing.T) {
 			name: "Expired refresh token",
 			setupFunc: func() string {
 				claims := OwnClaims{
+					SessionID: sessionId,
 					TokenType: TokenTypeRefresh,
 					RegisteredClaims: jwt.RegisteredClaims{
 						ExpiresAt: &jwt.NumericDate{Time: time.Now().Add(-time.Hour)},
@@ -262,7 +303,7 @@ func TestJWTService_ValidateRefreshToken(t *testing.T) {
 		{
 			name: "Access token used as refresh token",
 			setupFunc: func() string {
-				token, _, _ := JWTServiceInstance.GenerateToken("user-123")
+				token, _, _ := JWTServiceInstance.GenerateToken(context.TODO(), slog.Default(), "user-123", mockSessionID)
 				return token
 			},
 			wantErr: true,
@@ -279,7 +320,7 @@ func TestJWTService_ValidateRefreshToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			token := tt.setupFunc()
-			userID, err := JWTServiceInstance.ValidateRefreshToken(token)
+			userID, err := JWTServiceInstance.ValidateRefreshToken(context.TODO(), slog.Default(), token)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

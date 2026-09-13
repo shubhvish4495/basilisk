@@ -197,6 +197,6 @@ func HashString(s string) string {
 }
 
 func GetLogger(ctx context.Context) *slog.Logger {
-	requestId, _ := GetRequestIdFromContext(ctx)
+	requestId := GetRequestIdFromContext(ctx)
 	return slog.Default().With("request_id", requestId)
 }

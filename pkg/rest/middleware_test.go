@@ -1,6 +1,8 @@
 package rest
 
 import (
+	"context"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,26 +20,31 @@ type MockJWT struct {
 	refreshToken string
 	errorVar     error
 	user         *db.User
+	sessionID    string
 }
 
 // GenerateToken will generate mock token as set in MockJWT struct
-func (m *MockJWT) GenerateToken(userID string) (string, time.Time, error) {
+func (m *MockJWT) GenerateToken(ctx context.Context, logger *slog.Logger, userID, sessionID string) (string, time.Time, error) {
 	return m.token, time.Now().Add(time.Minute * 15), m.errorVar
 }
 
 // ValidateToken will generate mock token as set in MockJWT struct
-func (m *MockJWT) ValidateToken(token string) (string, error) {
-	return m.user.ID, m.errorVar
+func (m *MockJWT) ValidateToken(ctx context.Context, logger *slog.Logger, token string) (string, string, error) {
+	return m.user.ID, m.sessionID, m.errorVar
 }
 
 // GenerateRefreshToken will generate mock refresh token as set in MockJWT struct
-func (m *MockJWT) GenerateRefreshToken(userID string) (string, error) {
+func (m *MockJWT) GenerateRefreshToken(ctx context.Context, logger *slog.Logger, userID, sessionID string) (string, error) {
 	return m.refreshToken, m.errorVar
 }
 
 // ValidateRefreshToken will validate mock refresh token as set in MockJWT struct
-func (m *MockJWT) ValidateRefreshToken(token string) (string, error) {
+func (m *MockJWT) ValidateRefreshToken(ctx context.Context, logger *slog.Logger, token string) (string, error) {
 	return m.user.ID, m.errorVar
+}
+
+func (m *MockJWT) AddSesssionToDenyList(ctx context.Context, logger *slog.Logger, sessionID string) error {
+	return nil
 }
 
 func TestLoggingMiddleware(t *testing.T) {

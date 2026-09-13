@@ -1,11 +1,12 @@
 package db
 
 import (
-	"basilisk/pkg/helper"
 	"context"
 	"database/sql"
 	"errors"
 	"log/slog"
+
+	"basilisk/pkg/helper"
 )
 
 type AuthType string

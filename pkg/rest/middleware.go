@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -11,14 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"basilisk/pkg/auth"
-)
-
-type ctxKey int
-
-const (
-	uuidKey ctxKey = iota
-	userKey
-	userRoleKey
+	"basilisk/pkg/helper"
 )
 
 type CustomResponseLogger struct {
@@ -45,8 +37,8 @@ func (c *CustomResponseLogger) WriteHeader(code int) {
 //	An http.Handler that wraps the provided handler with logging functionality.
 func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		uuid := uuid.New()
-		ctx := context.WithValue(r.Context(), uuidKey, uuid)
+		uuid := uuid.New().String()
+		ctx := helper.SetRequestIdToContext(r.Context(), uuid)
 		wr := &CustomResponseLogger{
 			ResponseWriter: w,
 			StatusCode:     http.StatusOK,
@@ -117,15 +109,16 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		data, err := auth.JWTServiceInstance.ValidateToken(splittedHeader[1])
+		userID, sessionID, err := auth.JWTServiceInstance.ValidateToken(r.Context(), helper.GetLogger(r.Context()), splittedHeader[1])
 		if err != nil {
 			slog.Error("Invalid token", "error", err)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), userKey, data)
+		ctxWithUser := helper.SetUserToContext(r.Context(), userID)
+		ctxWithSession := helper.SetSessionIdToContext(ctxWithUser, sessionID)
 		// Call the next handler in the chain
-		next.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(w, r.WithContext(ctxWithSession))
 	})
 }
