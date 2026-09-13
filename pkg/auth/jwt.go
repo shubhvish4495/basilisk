@@ -52,7 +52,7 @@ type jwtService struct {
 // and used to configure the JWT service.
 //
 // Parameters:
-//   - context: context
+//   - ctx: context
 //   - secret: A base64 encoded string representing the JWT secret.
 //
 // Returns:
@@ -74,9 +74,13 @@ func LoadJWTService(ctx context.Context, secret string) error {
 // If the token is invalid or there is an error during parsing, it returns an error.
 //
 // Parameters:
+//   - ctx: Context for Generate Token method.
+//   - logger: Logger for Generate Token method.
 //   - token: A string representing the JWT token to be validated.
 //
 // Returns:
+//   - userID: unique identifier for the user.
+//   - sessionID: unique indentifier for the user's session.
 //   - error: An error if the token is invalid or if there is an error during parsing.
 func (j *jwtService) ValidateToken(ctx context.Context, logger *slog.Logger, token string) (string, string, error) {
 	claimsData := OwnClaims{}
@@ -141,10 +145,14 @@ func checkTokenAudience(audience jwt.ClaimStrings) bool {
 // The token is signed using the HS256 signing method and a secret key.
 //
 // Parameters:
+//   - ctx: Context for Generate Token method.
+//   - logger: Logger for Generate Token method.
 //   - userID: The unique identifier of the user.
+//   - sessionID: The unique identifier for the user session.
 //
 // Returns:
 //   - string: The signed JWT token as a string.
+//   - expiry: The expiry of JWT token.
 //   - error: An error if the token generation fails.
 func (j *jwtService) GenerateToken(ctx context.Context, logger *slog.Logger, userID, sessionID string) (string, time.Time, error) {
 	claims := OwnClaims{
@@ -175,7 +183,10 @@ func (j *jwtService) GenerateToken(ctx context.Context, logger *slog.Logger, use
 // It is signed using the HS256 signing method.
 //
 // Parameters:
+//   - ctx: Context for Generate Token method.
+//   - logger: Logger for Generate Token method.
 //   - userID: The unique identifier of the user.
+//   - sessionID: The unique identifier for the user session.
 //
 // Returns:
 //   - string: The signed JWT refresh token.
@@ -205,6 +216,8 @@ func (j *jwtService) GenerateRefreshToken(ctx context.Context, logger *slog.Logg
 // and token type. If valid, it returns the user UUID stored in the subject claim.
 //
 // Parameters:
+//   - ctx: Context for Generate Token method.
+//   - logger: Logger for Generate Token method.
 //   - token: A string representing the JWT refresh token to be validated.
 //
 // Returns:
@@ -264,6 +277,16 @@ func (j *jwtService) ValidateRefreshToken(ctx context.Context, logger *slog.Logg
 	return userUUID, nil
 }
 
+// AddSesssionToDenyList adds a session id to the deny list
+// by adding a cache entry for the same.
+//
+// Parameters:
+//   - ctx: Context for Generate Token method.
+//   - logger: Logger for Generate Token method.
+//   - sessionID: Unique identifier for user's session.
+//
+// Returns:
+//   - error: An error if there is an issue while adding session id to cache.
 func (j *jwtService) AddSesssionToDenyList(ctx context.Context, logger *slog.Logger, sessionID string) error {
 	return cache.GetInstance().Add(ctx, logger, fmt.Sprintf("%s:%s", denyUserSessionCacheKey, sessionID), "1", refreshTokenDuration)
 }
