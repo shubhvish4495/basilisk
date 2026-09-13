@@ -13,15 +13,6 @@ import (
 	"basilisk/pkg/helper"
 )
 
-type ctxKey int
-
-const (
-	uuidKey ctxKey = iota
-	userKey
-	userRoleKey
-	sessionKey
-)
-
 type CustomResponseLogger struct {
 	http.ResponseWriter
 	StatusCode int

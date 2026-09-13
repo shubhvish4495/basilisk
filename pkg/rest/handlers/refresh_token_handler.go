@@ -1,10 +1,11 @@
 package handlers
 
 import (
-	"basilisk/pkg/auth"
-	"basilisk/pkg/helper"
 	"encoding/json"
 	"net/http"
+
+	"basilisk/pkg/auth"
+	"basilisk/pkg/helper"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
