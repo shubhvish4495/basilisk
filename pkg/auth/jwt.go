@@ -3,36 +3,44 @@ package auth
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"time"
+
+	"basilisk/pkg/cache"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
 const (
-	ownServiceName       = "basilisk-auth-service"
-	TokenTypeAccess      = "access"
-	TokenTypeRefresh     = "refresh"
-	refreshTokenDuration = time.Hour * 24 * 30 // 30 days
-	accessTokenDuration  = time.Hour * 24 * 7  // 1 week
+	ownServiceName          = "basilisk-auth-service"
+	TokenTypeAccess         = "access"
+	TokenTypeRefresh        = "refresh"
+	refreshTokenDuration    = time.Hour * 24 * 30 // 30 days
+	accessTokenDuration     = time.Hour * 1       // 1 hour
+	denyUserSessionCacheKey = "jwt:session:deny-list"
 )
 
 var (
 	JWTServiceInstance JWTInterface
+	ErrSessionIsDenied = errors.New("session is already revoked")
 )
 
 type OwnClaims struct {
 	jwt.RegisteredClaims
 	UserID    string `json:"user_id"`
 	TokenType string `json:"type"`
+	SessionID string `json:"sid"`
 }
 
 type JWTInterface interface {
-	ValidateToken(token string) (string, error)
-	GenerateToken(userID string) (string, time.Time, error)
-	ValidateRefreshToken(token string) (string, error)
-	GenerateRefreshToken(userID string) (string, error)
+	ValidateToken(ctx context.Context, logger *slog.Logger, token string) (string, string, error)
+	GenerateToken(ctx context.Context, logger *slog.Logger, userID, sessionID string) (string, time.Time, error)
+	ValidateRefreshToken(ctx context.Context, logger *slog.Logger, token string) (string, error)
+	GenerateRefreshToken(ctx context.Context, logger *slog.Logger, userID, sessionID string) (string, error)
+	AddSesssionToDenyList(ctx context.Context, logger *slog.Logger, sessionID string) error
 }
 
 type jwtService struct {
@@ -70,37 +78,46 @@ func LoadJWTService(ctx context.Context, secret string) error {
 //
 // Returns:
 //   - error: An error if the token is invalid or if there is an error during parsing.
-func (j *jwtService) ValidateToken(token string) (string, error) {
+func (j *jwtService) ValidateToken(ctx context.Context, logger *slog.Logger, token string) (string, string, error) {
 	claimsData := OwnClaims{}
 	t, err := jwt.ParseWithClaims(token, &claimsData, func(token *jwt.Token) (any, error) {
 		return []byte(j.secret), nil
 	})
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	// if token is not valid return invalid token error
 	if !t.Valid {
-		return "", fmt.Errorf("invalid token")
+		return "", "", fmt.Errorf("invalid token")
 	}
 
 	// validate token type is correct
 	if claimsData.TokenType != TokenTypeAccess {
-		return "", fmt.Errorf("invalid token type")
+		return "", "", fmt.Errorf("invalid token type")
 	}
 
 	// get audience from claims
 	aud, err := t.Claims.GetAudience()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	// check audience for token
 	if !checkTokenAudience(aud) {
-		return "", fmt.Errorf("invalid audience")
+		return "", "", fmt.Errorf("invalid audience")
 	}
 
-	return claimsData.UserID, nil
+	// do session related check, if any other error than proper revoke of session
+	// we move forward for any other error
+	sessionID := claimsData.SessionID
+
+	err = j.checkIfSessionIsDenied(ctx, logger, sessionID)
+	if err != nil && errors.Is(err, ErrSessionIsDenied) {
+		return "", "", fmt.Errorf("session is already revoked. User access is denied with this token")
+	}
+
+	return claimsData.UserID, sessionID, nil
 }
 
 // checkTokenAudience checks if the provided audience contains the service's own name.
@@ -129,10 +146,11 @@ func checkTokenAudience(audience jwt.ClaimStrings) bool {
 // Returns:
 //   - string: The signed JWT token as a string.
 //   - error: An error if the token generation fails.
-func (j *jwtService) GenerateToken(userID string) (string, time.Time, error) {
+func (j *jwtService) GenerateToken(ctx context.Context, logger *slog.Logger, userID, sessionID string) (string, time.Time, error) {
 	claims := OwnClaims{
 		UserID:    userID,
 		TokenType: TokenTypeAccess,
+		SessionID: sessionID,
 	}
 
 	// populate claims field
@@ -162,7 +180,7 @@ func (j *jwtService) GenerateToken(userID string) (string, time.Time, error) {
 // Returns:
 //   - string: The signed JWT refresh token.
 //   - error: An error if the token signing fails.
-func (j *jwtService) GenerateRefreshToken(userID string) (string, error) {
+func (j *jwtService) GenerateRefreshToken(ctx context.Context, logger *slog.Logger, userID, sessionID string) (string, error) {
 	now := time.Now()
 	expiresAt := now.Add(refreshTokenDuration)
 
@@ -176,6 +194,7 @@ func (j *jwtService) GenerateRefreshToken(userID string) (string, error) {
 	claims.Subject = userID
 	claims.NotBefore = &jwt.NumericDate{Time: now}
 	claims.TokenType = TokenTypeRefresh
+	claims.SessionID = sessionID
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(j.secret))
@@ -191,7 +210,7 @@ func (j *jwtService) GenerateRefreshToken(userID string) (string, error) {
 // Returns:
 //   - string: The user UUID extracted from the token's subject claim.
 //   - error: An error if the token is invalid, expired, or missing required claims.
-func (j *jwtService) ValidateRefreshToken(token string) (string, error) {
+func (j *jwtService) ValidateRefreshToken(ctx context.Context, logger *slog.Logger, token string) (string, error) {
 	// Parse the token with standard claims
 	claims := OwnClaims{}
 	t, err := jwt.ParseWithClaims(token, &claims, func(token *jwt.Token) (any, error) {
@@ -235,5 +254,30 @@ func (j *jwtService) ValidateRefreshToken(token string) (string, error) {
 		return "", fmt.Errorf("missing user UUID in refresh token")
 	}
 
+	sessionID := claims.SessionID
+
+	err = j.checkIfSessionIsDenied(ctx, logger, sessionID)
+	if err != nil && errors.Is(err, ErrSessionIsDenied) {
+		return "", fmt.Errorf("session is already revoked. User access is denied with this token")
+	}
+
 	return userUUID, nil
+}
+
+func (j *jwtService) AddSesssionToDenyList(ctx context.Context, logger *slog.Logger, sessionID string) error {
+	return cache.GetInstance().Add(ctx, logger, fmt.Sprintf("%s:%s", denyUserSessionCacheKey, sessionID), "1", refreshTokenDuration)
+}
+
+func (j *jwtService) checkIfSessionIsDenied(ctx context.Context, logger *slog.Logger, sessionID string) error {
+	var val string
+	err := cache.GetInstance().Get(ctx, logger, fmt.Sprintf("%s:%s", denyUserSessionCacheKey, sessionID), &val)
+	if err != nil {
+		return err
+	}
+
+	if val == "1" {
+		return ErrSessionIsDenied
+	}
+
+	return nil
 }

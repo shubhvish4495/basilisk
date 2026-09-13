@@ -13,3 +13,8 @@ jwt:
 google:
   auth_secret: "${GOOGLE_AUTH_SECRET}"
   auth_client_id: "${GOOGLE_AUTH_CLIENT_ID}"
+cache:
+  host: "${CACHE_HOST}"
+  port: "${CACHE_PORT}"
+  username: "${CACHE_USERNAME}"
+  password: "${CACHE_PASSWORD}"

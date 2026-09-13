@@ -2,7 +2,6 @@ package helper
 
 import (
 	"context"
-	"errors"
 )
 
 type ctxKey int
@@ -11,6 +10,7 @@ const (
 	uuidKey ctxKey = iota
 	userKey
 	userRoleKey
+	sessionKey
 )
 
 // SetUserToContext returns a new context with the provided user.User value associated with the userKey.
@@ -40,10 +40,22 @@ func SetRequestIdToContext(ctx context.Context, requestId string) context.Contex
 	return context.WithValue(ctx, uuidKey, requestId)
 }
 
-func GetRequestIdFromContext(ctx context.Context) (string, error) {
+func GetRequestIdFromContext(ctx context.Context) string {
 	requestId := ctx.Value(uuidKey)
 	if requestId == nil {
-		return "", errors.New("request ID not found in context")
+		return ""
 	}
-	return requestId.(string), nil
+	return requestId.(string)
+}
+
+func SetSessionIdToContext(ctx context.Context, sessionID string) context.Context {
+	return context.WithValue(ctx, sessionKey, sessionID)
+}
+
+func GetSessionIdFromContext(ctx context.Context) string {
+	sessionID := ctx.Value(sessionKey)
+	if sessionID == nil {
+		return ""
+	}
+	return sessionID.(string)
 }
