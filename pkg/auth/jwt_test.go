@@ -1,8 +1,11 @@
 package auth
 
 import (
+	"basilisk/pkg/cache"
+	"basilisk/pkg/helper"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"log/slog"
 	"testing"
 	"time"
@@ -16,9 +19,42 @@ const (
 	mockSessionID = "test-session-id"
 )
 
+type MockCache struct {
+	AddError    error
+	GetError    error
+	DeleteError error
+	Data        []byte
+}
+
+func (m *MockCache) Add(ctx context.Context, logger *slog.Logger, key string, data any, ttl ...time.Duration) error {
+	return m.AddError
+}
+
+func (m *MockCache) Get(ctx context.Context, logger *slog.Logger, key string, target any) error {
+	switch ptr := target.(type) {
+	case *string:
+		*ptr = string(m.Data)
+	case *[]byte:
+		*ptr = m.Data
+	default:
+		if err := json.Unmarshal(m.Data, target); err != nil {
+			logger.Error("error while unmarshalling data", "error", err)
+			return helper.InternalServerError
+		}
+	}
+	return m.GetError
+}
+
+func (m *MockCache) Delete(ctx context.Context, logger *slog.Logger, key string) error {
+	return m.DeleteError
+}
+
 func setupTest(t *testing.T) {
 	err := LoadJWTService(context.Background(), testSecret)
 	assert.NoError(t, err)
+
+	m := MockCache{}
+	cache.SetInstance(&m)
 }
 
 func TestInit(t *testing.T) {
